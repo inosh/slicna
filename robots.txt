@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /pages/admin-login
+
+Sitemap: https://slicna.lk/sitemap.xml
