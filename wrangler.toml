@@ -1,0 +1,7 @@
+name = "slicna"
+compatibility_date = "2026-10-01"
+
+# Static site: Cloudflare serves the built dist/ folder directly (run `npm run build` first).
+# Add `main = "worker.js"` here later if server-side logic is needed, as in the SLNA site.
+[assets]
+directory = "./dist"
