@@ -26,6 +26,25 @@ const TYPES = {
 const rebuild = () => build({ clean: false });
 try { build(); } catch (err) { rebuild(); }
 
+// A fingerprint of every watched file (path, size, modified time). On Windows fs.watch also
+// fires when files are only read, which the build itself does, so rebuilding on every event
+// loops forever. Rebuilding only when the fingerprint changes breaks that loop.
+function fingerprint() {
+  const parts = [];
+  const walk = (p) => {
+    if (!fs.existsSync(p)) return;
+    const stat = fs.statSync(p);
+    if (stat.isDirectory()) {
+      for (const name of fs.readdirSync(p)) walk(path.join(p, name));
+    } else {
+      parts.push(`${p}:${stat.size}:${stat.mtimeMs}`);
+    }
+  };
+  WATCH.forEach((target) => walk(path.join(__dirname, target)));
+  return parts.join('|');
+}
+
+let lastFingerprint = fingerprint();
 let timer = null;
 for (const target of WATCH) {
   const full = path.join(__dirname, target);
@@ -33,6 +52,9 @@ for (const target of WATCH) {
   fs.watch(full, { recursive: true }, () => {
     clearTimeout(timer);
     timer = setTimeout(() => {
+      const current = fingerprint();
+      if (current === lastFingerprint) return;
+      lastFingerprint = current;
       try { rebuild(); } catch (err) { console.error('[build failed]', err.message); }
     }, 150);
   });

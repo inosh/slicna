@@ -376,7 +376,7 @@ p { margin: 0 0 1em; }
 }
 
 /* ---------- People ---------- */
-.people { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+.people { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 22px; max-width: 980px; margin-inline: auto; }
 .person { text-align: left; }
 .person .photo { aspect-ratio: 4 / 5; border-radius: 120px 120px var(--radius) var(--radius); overflow: hidden; background: linear-gradient(160deg, var(--mint), var(--paper-2)); display: grid; place-items: center; margin-bottom: 14px; }
 .person .photo img { width: 100%; height: 100%; object-fit: cover; }
@@ -384,9 +384,8 @@ p { margin: 0 0 1em; }
 .person h3 { font-size: 19px; margin: 0 0 2px; }
 .person .role { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--coral-deep); }
 .person .desig { font-size: 14px; color: var(--ink-2); margin-top: 4px; }
-.people-lead { grid-template-columns: repeat(3, 1fr); margin-bottom: 40px; }
-@media (max-width: 960px) { .people { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 700px) { .people, .people-lead { grid-template-columns: repeat(2, 1fr); gap: 16px; } }
+.people-lead { margin-bottom: 28px; }
+@media (max-width: 700px) { .people { grid-template-columns: repeat(2, 1fr); gap: 22px 16px; } }
 
 /* ---------- Tables ---------- */
 .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
