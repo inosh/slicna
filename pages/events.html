@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Events &amp; Workshops | SLICNA</title>
+  <meta name="description" content="Upcoming and past SLICNA CPD programmes, international workshops and community events.">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="learning">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="page-head">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / Learning / Events</nav>
+      <p class="eyebrow">Events &amp; workshops</p>
+      <h1>Learn, take part, connect</h1>
+      <p class="lede">CPD programmes, international workshops and community events, all in one place.</p>
+    </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0">
+    <div class="wrap">
+      <div class="chips" role="group" aria-label="Filter events">
+        <button class="chip" type="button" data-when="upcoming" aria-pressed="true">Upcoming</button>
+        <button class="chip" type="button" data-when="past" aria-pressed="false">Past</button>
+        <span style="width:1px;background:var(--line);margin:0 6px"></span>
+        <button class="chip" type="button" data-cat="all" aria-pressed="true">All</button>
+        <button class="chip" type="button" data-cat="cpd" aria-pressed="false">CPD</button>
+        <button class="chip" type="button" data-cat="international" aria-pressed="false">International</button>
+        <button class="chip" type="button" data-cat="community" aria-pressed="false">Community</button>
+      </div>
+      <div class="event-list" id="events-list"><div class="skeleton"></div><div class="skeleton"></div></div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/demo-data.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/events.js"></script>
+</body>
+</html>

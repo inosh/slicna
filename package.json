@@ -1,0 +1,8 @@
+{
+  "name": "slicna",
+  "private": true,
+  "scripts": {
+    "build": "node build-pages.js",
+    "dev": "node dev-server.js"
+  }
+}

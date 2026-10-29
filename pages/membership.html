@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Membership | SLICNA</title>
+  <meta name="description" content="Join the Sri Lanka Intensive Care Nurses Association. Membership categories, benefits and the online application.">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="membership">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="page-head">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / Membership</nav>
+      <p class="eyebrow">Join SLICNA</p>
+      <h1>Learn, take part, connect and make a difference</h1>
+      <p class="lede">Membership is open to nurses working in, or committed to, critical care in Sri Lanka. Join a national network that is raising the standard of ICU nursing.</p>
+      <p><a href="#apply" class="btn btn-coral">Apply online</a></p>
+    </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0">
+    <div class="wrap">
+      <div class="grid-3 reveal">
+        <article class="card"><span class="pillar-num">01</span><h3 style="margin-top:14px">Accredited CPD</h3><p class="muted">Priority places and member rates at CPD programmes with Ministry of Health points.</p></article>
+        <article class="card"><span class="pillar-num">02</span><h3 style="margin-top:14px">A global network</h3><p class="muted">A link to the world's critical care nurses through our full membership of WFCCN.</p></article>
+        <article class="card"><span class="pillar-num">03</span><h3 style="margin-top:14px">A voice for ICU nurses</h3><p class="muted">Help shape standards, take part in research and stand for election to the committee.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div>
+          <p class="eyebrow">Categories</p>
+          <h2>Choose your membership</h2>
+        </div>
+        <p>Fees are confirmed by the executive committee each year.</p>
+      </div>
+      <div class="tiers reveal" id="tiers">
+        <article class="tier">
+          <h3>Ordinary member</h3>
+          <p class="muted">Registered nurses working in ICU, HDU, emergency or other critical care settings.</p>
+          <div class="price" data-fee="ordinary" data-period=" / year"><span class="price-tbc">Fee to be confirmed</span></div>
+          <ul><li>Voting rights at general meetings</li><li>Member rates for CPD programmes</li><li>Eligible to stand for office</li></ul>
+          <a href="#apply" class="btn btn-line" data-choose="ordinary">Apply as ordinary member</a>
+        </article>
+        <article class="tier is-featured">
+          <span class="tag" style="align-self:flex-start;background:var(--coral);color:#fff">Best value</span>
+          <h3 style="margin-top:12px">Life member</h3>
+          <p class="muted">Pay once and stay a member for your whole career.</p>
+          <div class="price" data-fee="life" data-period=" one-time"><span class="price-tbc">Fee to be confirmed</span></div>
+          <ul><li>All ordinary member benefits</li><li>No annual renewal</li><li>Recognised as a life member</li></ul>
+          <a href="#apply" class="btn btn-coral" data-choose="life">Apply as life member</a>
+        </article>
+        <article class="tier">
+          <h3>Associate member</h3>
+          <p class="muted">Nurses and nursing educators outside critical care who support our aims.</p>
+          <div class="price" data-fee="associate" data-period=" / year"><span class="price-tbc">Fee to be confirmed</span></div>
+          <ul><li>Access to CPD programmes</li><li>Association news and updates</li><li>Community programme volunteering</li></ul>
+          <a href="#apply" class="btn btn-line" data-choose="associate">Apply as associate</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-white">
+    <div class="wrap">
+      <div class="section-head reveal"><div><p class="eyebrow">How to join</p><h2>Four simple steps</h2></div></div>
+      <ol class="steps reveal">
+        <li><h3>Apply online</h3><p>Fill in the form below with your professional details.</p></li>
+        <li><h3>Upload documents</h3><p>Add a photo and a copy of your nursing registration.</p></li>
+        <li><h3>Pay the fee</h3><p>Pay by bank transfer and upload the receipt.</p></li>
+        <li><h3>Welcome aboard</h3><p>The committee reviews your application and confirms by email.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="apply">
+    <div class="wrap split">
+      <div class="reveal">
+        <p class="eyebrow">Application</p>
+        <h2 style="font-size:clamp(30px,4.4vw,46px)">Membership application</h2>
+        <p class="muted">It takes about five minutes. Fields marked optional can be left blank. Your details are used only to process your membership.</p>
+        <div class="card" style="margin-top:24px">
+          <h3 style="font-size:19px">Need help?</h3>
+          <p class="muted" style="margin:0">Call <a href="tel:+94713385768">071 338 5768</a> or email <a href="mailto:slicna2022@gmail.com">slicna2022@gmail.com</a>.</p>
+        </div>
+      </div>
+      <div class="form-card reveal">
+        <form id="apply-form" class="form-grid" novalidate>
+          <p class="form-legend full">Membership</p>
+          <div class="field full">
+            <label for="a-category">Category</label>
+            <select id="a-category" name="category" required>
+              <option value="ordinary">Ordinary member</option>
+              <option value="life">Life member</option>
+              <option value="associate">Associate member</option>
+            </select>
+          </div>
+
+          <p class="form-legend full">Personal details</p>
+          <div class="field full"><label for="a-name">Full name (as on NIC)</label><input id="a-name" name="full_name" required autocomplete="name"></div>
+          <div class="field"><label for="a-initials">Name with initials</label><input id="a-initials" name="name_with_initials" required></div>
+          <div class="field"><label for="a-nic">NIC number</label><input id="a-nic" name="nic" required></div>
+          <div class="field"><label for="a-dob">Date of birth</label><input id="a-dob" name="date_of_birth" type="date" required></div>
+          <div class="field"><label for="a-phone">Mobile number</label><input id="a-phone" name="phone" type="tel" required autocomplete="tel"></div>
+          <div class="field full"><label for="a-email">Email</label><input id="a-email" name="email" type="email" required autocomplete="email"></div>
+          <div class="field full"><label for="a-address">Postal address</label><input id="a-address" name="address" required autocomplete="street-address"></div>
+
+          <p class="form-legend full">Professional details</p>
+          <div class="field"><label for="a-slnc">SLNC registration no.</label><input id="a-slnc" name="slnc_number" required></div>
+          <div class="field"><label for="a-grade">Grade / designation</label><input id="a-grade" name="designation" required placeholder="e.g. Nursing Officer"></div>
+          <div class="field"><label for="a-hospital">Hospital</label><input id="a-hospital" name="hospital" required></div>
+          <div class="field"><label for="a-unit">Unit</label><input id="a-unit" name="unit" required placeholder="e.g. MICU, SICU, ETU"></div>
+          <div class="field full"><label for="a-years">Years of critical care experience <span class="opt">(optional)</span></label><input id="a-years" name="icu_years" type="number" min="0" max="50"></div>
+
+          <p class="form-legend full">Documents</p>
+          <div class="field"><label for="a-photo">Passport-size photo</label><input id="a-photo" name="photo" type="file" accept="image/*" required></div>
+          <div class="field"><label for="a-reg">Registration certificate</label><input id="a-reg" name="registration_doc" type="file" accept="image/*,.pdf" required></div>
+          <div class="field full"><label for="a-receipt">Payment receipt <span class="opt">(optional)</span></label><input id="a-receipt" name="payment_receipt" type="file" accept="image/*,.pdf"><p class="hint">Bank details are sent with your confirmation if you haven't paid yet.</p></div>
+
+          <label class="consent full"><input type="checkbox" name="consent" required> I confirm these details are correct and agree to abide by the SLICNA constitution.</label>
+          <div class="full"><button class="btn btn-coral btn-block" type="submit">Submit application</button></div>
+        </form>
+        <div class="form-status" id="apply-status" role="status"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/demo-data.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/forms.js"></script>
+<script src="/js/membership.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event | SLICNA</title>
+  <meta name="description" content="SLICNA event details and registration.">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="learning">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="page-head" style="padding-bottom:24px">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / <a href="/pages/events.html">Events</a> / <span id="crumb-title">Event</span></nav>
+      <span id="event-tag"></span>
+      <h1 id="event-title" style="max-width:24ch;margin-top:14px">Loading…</h1>
+    </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0">
+    <div class="wrap split">
+      <div>
+        <div class="figure-round" id="event-photo" style="margin-bottom:28px" hidden></div>
+        <div class="prose" id="event-body"></div>
+      </div>
+      <aside>
+        <dl class="facts" id="event-facts"></dl>
+        <div class="form-card" style="margin-top:20px" id="register-card" hidden>
+          <h2 style="font-size:24px">Register</h2>
+          <form id="register-form" class="form-grid" novalidate>
+            <div class="field full"><label for="r-name">Full name</label><input id="r-name" name="name" required autocomplete="name"></div>
+            <div class="field full"><label for="r-nic">NIC number</label><input id="r-nic" name="nic" required></div>
+            <div class="field full"><label for="r-phone">Mobile number</label><input id="r-phone" name="phone" type="tel" required autocomplete="tel"></div>
+            <div class="field full"><label for="r-email">Email <span class="opt">(optional)</span></label><input id="r-email" name="email" type="email" autocomplete="email"></div>
+            <div class="field full"><label for="r-hospital">Hospital / unit</label><input id="r-hospital" name="hospital" required></div>
+            <div class="full"><button class="btn btn-coral btn-block" type="submit">Register for this event</button></div>
+          </form>
+          <div class="form-status" id="register-status" role="status"></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/demo-data.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/forms.js"></script>
+<script src="/js/event-detail.js"></script>
+</body>
+</html>

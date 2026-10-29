@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>News | SLICNA</title>
+  <meta name="description" content="News from the Sri Lanka Intensive Care Nurses Association.">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="news">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="section-tight">
+    <article class="wrap article">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / <a href="/pages/news.html">News</a></nav>
+      <p class="meta" id="article-date"></p>
+      <h1 id="article-title">Loading…</h1>
+      <div class="article-hero" id="article-photo" hidden></div>
+      <div class="prose" id="article-body"></div>
+      <p style="margin-top:40px"><a href="/pages/news.html" class="link-arrow">Back to all news</a></p>
+    </article>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/demo-data.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    const id = new URLSearchParams(location.search).get('id');
+    let item = null;
+    try { item = id ? await SLICNA_API.newsItem(id) : null; } catch (err) { /* handled below */ }
+
+    const title = document.getElementById('article-title');
+    if (!item) {
+      title.textContent = 'Article not found';
+      return;
+    }
+    document.title = item.title + ' | SLICNA';
+    title.textContent = item.title;
+    document.getElementById('article-date').textContent = SLICNA.formatDate(item.published_at || item.event_date);
+    if (item.photo_url) {
+      const photo = document.getElementById('article-photo');
+      photo.innerHTML = `<img src="${SLICNA.escapeHtml(item.photo_url)}" alt="">`;
+      photo.hidden = false;
+    }
+    // Article bodies come from the admin editor; sanitise them once the backend serves real content.
+    document.getElementById('article-body').innerHTML = item.body || `<p>${SLICNA.escapeHtml(item.summary || '')}</p>`;
+  });
+</script>
+</body>
+</html>
