@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>News | SLICNA</title>
+  <meta name="description" content="News and announcements from the Sri Lanka Intensive Care Nurses Association.">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="news">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="page-head">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / News</nav>
+      <p class="eyebrow">Newsroom</p>
+      <h1>News &amp; announcements</h1>
+      <p class="lede">Awards, programmes and updates from across the association.</p>
+    </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0">
+    <div class="wrap">
+      <div class="news-grid" id="news-list"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/demo-data.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    const el = document.getElementById('news-list');
+    try {
+      const news = await SLICNA_API.news();
+      el.innerHTML = news.length
+        ? news.map((n, i) => SLICNA.newsCard(n, i === 0)).join('')
+        : '<p class="empty">No news yet.</p>';
+    } catch (err) {
+      el.innerHTML = '<p class="empty">News could not be loaded right now.</p>';
+    }
+  });
+</script>
+</body>
+</html>

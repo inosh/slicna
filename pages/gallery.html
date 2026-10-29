@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gallery | SLICNA</title>
+  <meta name="description" content="Photos from SLICNA programmes, awards and community health events.">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="gallery">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="page-head">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / Gallery</nav>
+      <p class="eyebrow">Gallery</p>
+      <h1>Moments from our work</h1>
+      <p class="lede">CPD programmes, awards and community events in pictures.</p>
+    </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0">
+    <div class="wrap">
+      <div class="chips" id="album-chips" role="group" aria-label="Albums"></div>
+      <div class="masonry" id="gallery-grid"></div>
+    </div>
+  </section>
+
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
+    <button class="lightbox-close" type="button" aria-label="Close">&times;</button>
+    <figure style="margin:0"><img alt=""><p></p></figure>
+  </div>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/demo-data.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/gallery.js"></script>
+</body>
+</html>

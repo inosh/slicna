@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff login | SLICNA</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="section">
+    <div class="wrap" style="max-width:480px">
+      <div class="form-card">
+        <img src="/images/slicna-logo.png" alt="" width="64" height="64" style="margin-bottom:12px">
+        <h1 style="font-size:32px">Staff login</h1>
+        <p class="muted">For SLICNA committee members who manage website content.</p>
+        <form id="login-form" class="form-grid" novalidate>
+          <div class="field full"><label for="l-email">Email</label><input id="l-email" name="email" type="email" required autocomplete="username"></div>
+          <div class="field full"><label for="l-password">Password</label><input id="l-password" name="password" type="password" required autocomplete="current-password"></div>
+          <div class="full"><button class="btn btn-teal btn-block" type="submit">Log in</button></div>
+        </form>
+        <div class="form-status" id="login-status" role="status"></div>
+        <p class="muted" style="font-size:13.5px;margin-top:16px">The admin panel will be added with the backend.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/demo-data.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/forms.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    SLICNA_FORMS.bind('login-form', 'login-status', () => Promise.reject(new Error('Backend not connected')), '');
+  });
+</script>
+</body>
+</html>
