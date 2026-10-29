@@ -23,16 +23,21 @@ const SLICNA_DEMO = {
     { id: 'radio-awareness', title: 'On air: SLICNA nurses talk health on national radio', published_at: '2026-06-02', photo_url: '/images/radio-awareness.jpg', summary: 'Our members joined radio programmes to share practical health advice with the public.', body: '<p>SLICNA members have taken part in radio health programmes, sharing practical advice on preventing illness and recognising warning signs early.</p>' }
   ],
 
+  // Executive Committee 2025–2027, elected 24 January 2025 (from SLICNA's letter of 29/10/2025).
   committee: {
+    term: '2025 – 2027',
+    elected_on: '2025-01-24',
     members: [
-      { slot_key: 'president', role_title: 'President', name: '', designation: '' },
-      { slot_key: 'vice-president', role_title: 'Vice President', name: '', designation: '' },
-      { slot_key: 'secretary', role_title: 'Secretary', name: '', designation: '' },
-      { slot_key: 'assistant-secretary', role_title: 'Assistant Secretary', name: '', designation: '' },
-      { slot_key: 'treasurer', role_title: 'Treasurer', name: '', designation: '' },
-      { slot_key: 'assistant-treasurer', role_title: 'Assistant Treasurer', name: '', designation: '' },
-      { slot_key: 'editor', role_title: 'Editor', name: '', designation: '' },
-      { slot_key: 'education-coordinator', role_title: 'Education Coordinator', name: '', designation: '' }
+      // Listed in the same order as the letter; the page shows them in this order.
+      { slot_key: 'president', role_title: 'President', name: 'G.R.S.S.B. Athurupana', photo_url: '/images/committee/president.jpg' },
+      { slot_key: 'general-secretary', role_title: 'General Secretary', name: 'K.A.D.P. Vidyarathna', photo_url: '/images/committee/general-secretary.jpg' },
+      { slot_key: 'treasurer', role_title: 'Treasurer', name: 'A.H.A.D.R. Amunugama', photo_url: '/images/committee/treasurer.jpg' },
+      { slot_key: 'chief-organizer-1', role_title: 'Chief Organizer', name: 'K.G.A.S.K. Dharmarathne', photo_url: '/images/committee/chief-organizer-1.jpg' },
+      { slot_key: 'chief-organizer-2', role_title: 'Chief Organizer', name: 'R.M.P.B. Senavirathna', photo_url: '/images/committee/chief-organizer-2.jpg' },
+      { slot_key: 'vice-president', role_title: 'Vice President', name: 'Nelka Hettiarachchi', photo_url: '/images/committee/vice-president.jpg' },
+      { slot_key: 'vice-secretary', role_title: 'Vice Secretary', name: 'H.G.G.P. Samarasinghe' },
+      { slot_key: 'deputy-treasurer', role_title: 'Deputy Treasurer', name: 'K.A.A. Udayangani' },
+      { slot_key: 'media-secretary', role_title: 'Media Secretary', name: 'K.S.C. Dissanayaka' }
     ]
   },
 
