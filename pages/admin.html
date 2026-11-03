@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin | SLICNA</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin-body">
+  <header class="admin-top">
+    <a href="/pages/admin.html" class="brand">
+      <img src="/images/slicna-logo.png" alt="" width="40" height="40">
+      <span class="brand-text"><strong>SLICNA</strong><small>Website admin</small></span>
+    </a>
+    <div class="admin-top-actions">
+      <span class="admin-user" id="admin-user"></span>
+      <a class="btn btn-ghost btn-sm" href="/index.html" target="_blank" rel="noopener">View site</a>
+      <button class="btn btn-ghost btn-sm" type="button" id="change-password-btn">Change password</button>
+      <button class="btn btn-coral btn-sm" type="button" id="logout-btn">Log out</button>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+    <nav class="admin-nav" id="admin-nav" aria-label="Admin sections"></nav>
+    <main class="admin-main" id="admin-main"></main>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/admin-membership.js"></script>
+</body>
+</html>

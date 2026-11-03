@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       .filter((a) => albumId === 'all' || String(a.id) === albumId)
       .flatMap((a) => (a.photos || []).map((p) => ({ ...p, album: a.title })));
     gridEl.innerHTML = photos.map((p) => `
-      <figure tabindex="0" data-src="${esc(p.url)}" data-caption="${esc(p.caption || p.album)}">
-        <img src="${esc(p.url)}" alt="${esc(p.caption || p.album)}" decoding="async">
+      <figure tabindex="0" data-src="${SLICNA.media(p.url)}" data-caption="${esc(p.caption || p.album)}">
+        <img src="${SLICNA.media(p.url)}" alt="${esc(p.caption || p.album)}" decoding="async">
         <figcaption>${esc(p.caption || p.album)}</figcaption>
       </figure>`).join('') || '<p class="empty">No photos yet.</p>';
   }

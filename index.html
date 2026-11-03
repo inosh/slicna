@@ -28,7 +28,7 @@
         <h1>Critical care, carried by <em>skilled</em> hands and a steady <span class="heart">heart.</span></h1>
         <p class="lede">SLICNA brings together the nurses who work in Sri Lanka's intensive care, high dependency and emergency units. We raise standards through accredited learning, shared evidence and a strong professional voice.</p>
         <div class="hero-actions">
-          <a href="/pages/membership.html#apply" class="btn btn-coral">Become a member</a>
+          <a href="/pages/membership.html" class="btn btn-coral">Become a member</a>
           <a href="/pages/cpd.html" class="btn btn-line">Explore CPD programmes</a>
         </div>
         <div class="hero-badges">
@@ -41,8 +41,8 @@
       <div class="hero-visual" aria-hidden="true">
         <div class="hero-arch"><img src="/images/cpd-audience.jpg" alt=""></div>
         <div class="hero-card hero-card-stat">
-          <b>53.5</b>
-          <span>CPD points offered across 2026</span>
+          <b id="hero-cpd-total">&nbsp;</b>
+          <span>CPD points offered across <span data-cpd-year></span></span>
         </div>
         <div class="hero-card hero-card-wfccn">
           <span class="dot">
@@ -125,11 +125,11 @@
   <section class="section">
     <div class="wrap split">
       <div class="reveal">
-        <p class="eyebrow">CPD summary 2026</p>
-        <div class="big-stat">53.5<small>points</small></div>
+        <p class="eyebrow">CPD summary <span data-cpd-year></span></p>
+        <div class="big-stat"><span id="cpd-total">&nbsp;</span><small>points</small></div>
         <div class="stat-row">
-          <div><b>9</b><span>accredited programmes</span></div>
-          <div><b>1</b><span>international workshop</span></div>
+          <div><b id="cpd-count">&nbsp;</b><span>accredited programmes</span></div>
+          <div><b id="cpd-intl">&nbsp;</b><span id="cpd-intl-label">international workshops</span></div>
         </div>
         <p class="muted">CPD points are awarded by the Education, Training &amp; Research Unit of the Ministry of Health, Sri Lanka. Our commitment: high-quality, evidence-based education and lifelong professional development.</p>
         <a href="/pages/cpd.html" class="btn btn-teal">View the full CPD programme</a>
@@ -179,41 +179,7 @@
         </div>
         <a href="/pages/community.html" class="link-arrow">Our community work</a>
       </div>
-      <div class="bento reveal">
-        <article class="bento-item bento-feature">
-          <img src="/images/school-health.jpg" alt="Students practising first aid during the SLICNA School Health Programme">
-          <div class="bento-body">
-            <span class="tag">School Health Programme</span>
-            <h3>අකුරට සවිය: emergency skills for students</h3>
-            <p>Nurses teach first aid and emergency response in schools, so young people know what to do in the first minutes.</p>
-          </div>
-        </article>
-        <article class="bento-item">
-          <img src="/images/radio-awareness.jpg" alt="SLICNA nurses in a radio studio">
-          <div class="bento-body">
-            <h3>On air</h3>
-            <p>Health talks on national radio, including the සුව දිවිය programme.</p>
-          </div>
-        </article>
-        <article class="bento-item bento-quote">
-          <p>"Take a step. Spread the word."</p>
-          <small>World Diabetes Day walk &middot; Kotawa to Maharagama &middot; 17 November 2026</small>
-        </article>
-        <article class="bento-item">
-          <img src="/images/diabetes-walk.jpg" alt="World Diabetes Day 2026 walk poster">
-          <div class="bento-body">
-            <h3>Public campaigns</h3>
-            <p>Awareness walks and campaigns on diabetes and other conditions.</p>
-          </div>
-        </article>
-        <article class="bento-item">
-          <img src="/images/award-ceremony.jpg" alt="SLICNA Annual Award Ceremony 2025">
-          <div class="bento-body">
-            <h3>SLICNA Award</h3>
-            <p>Recognising excellence in nursing each year.</p>
-          </div>
-        </article>
-      </div>
+      <div class="bento reveal" id="home-community"><div class="skeleton" style="grid-column:1/-1;min-height:300px"></div></div>
     </div>
   </section>
 
@@ -237,7 +203,6 @@
 <div id="site-footer"></div>
 
 <script src="/js/config.js"></script>
-<script src="/js/demo-data.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/main.js"></script>
 <script src="/js/home.js"></script>

@@ -1,58 +1,61 @@
-// Thin wrapper around the SLICNA backend. Endpoints mirror the SLNA backend's shape so
-// slicna-backend can be built from it later. Falls back to SLICNA_DEMO when the API is unreachable.
+// Thin wrapper around slicna-backend. Public pages only read; the admin panel
+// (js/admin.js) uses SLICNA_API.request with a token for writes.
 const SLICNA_API = (() => {
   const base = SLICNA_CONFIG.API_BASE_URL.replace(/\/+$/, '');
-  const TIMEOUT_MS = 4000;
-  const DEMO_ONLY = SLICNA_CONFIG.DATA_SOURCE === 'demo';
+  const origin = base.replace(/\/api$/, '');
+  // Long enough for an application with three photo or PDF uploads on a slow connection.
+  const TIMEOUT_MS = 60000;
 
+  // Errors carry the API's own message (e.g. "Title is required.") and HTTP status.
   async function request(path, options = {}) {
-    if (DEMO_ONLY) throw new Error('Demo mode: API calls are switched off');
-
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
       const res = await fetch(base + path, { ...options, signal: controller.signal });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data.error || 'Request failed (' + res.status + ')');
+        err.status = res.status;
+        throw err;
+      }
+      return data;
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('The server took too long to respond. Please try again.');
+      if (err instanceof TypeError) throw new Error('Could not reach the server. Check your connection and try again.');
+      throw err;
     } finally {
       clearTimeout(timer);
     }
   }
 
-  async function get(path, demoValue) {
-    try {
-      return await request(path);
-    } catch (err) {
-      if ((DEMO_ONLY || SLICNA_CONFIG.USE_DEMO_FALLBACK) && demoValue !== undefined) {
-        if (!DEMO_ONLY) console.info('[SLICNA] API unavailable for ' + path + ', showing demo content.');
-        return typeof demoValue === 'function' ? demoValue() : demoValue;
-      }
-      throw err;
-    }
+  // Uploaded images are stored as "/uploads/..." paths on the backend.
+  function mediaUrl(url) {
+    if (!url) return '';
+    return url.startsWith('/uploads/') ? origin + url : url;
   }
 
-  async function post(path, body) {
-    const isForm = body instanceof FormData;
-    return request(path, {
-      method: 'POST',
-      headers: isForm ? undefined : { 'Content-Type': 'application/json' },
-      body: isForm ? body : JSON.stringify(body)
-    });
-  }
-
-  const byDateAsc = (a, b) => new Date(a.event_date) - new Date(b.event_date);
-  const byDateDesc = (a, b) => new Date(b.event_date || b.published_at) - new Date(a.event_date || a.published_at);
+  // The contact form isn't connected yet.
+  const notYetOpen = () => Promise.reject(Object.assign(new Error('Not open yet'), { notOpen: true }));
+  const postJson = (path, body) => request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
   return {
-    news: () => get('/news', () => SLICNA_DEMO.news).then((list) => [...list].sort(byDateDesc)),
-    newsItem: (id) => get('/news/' + encodeURIComponent(id), () => SLICNA_DEMO.news.find((n) => String(n.id) === String(id))),
-    events: () => get('/events', () => SLICNA_DEMO.events).then((list) => [...list].sort(byDateAsc)),
-    event: (id) => get('/events/' + encodeURIComponent(id), () => SLICNA_DEMO.events.find((e) => String(e.id) === String(id))),
-    committee: () => get('/executive-committee', () => SLICNA_DEMO.committee),
-    albums: () => get('/albums', () => SLICNA_DEMO.albums),
-    fees: () => get('/membership-fees', () => SLICNA_DEMO.fees),
-    applyMembership: (formData) => post('/membership/apply', formData),
-    sendContact: (data) => post('/contact-queries', data),
-    registerEvent: (id, data) => post('/event-registrations', { event_id: id, ...data })
+    request,
+    mediaUrl,
+    news: () => request('/news'),
+    newsItem: (id) => request('/news/' + encodeURIComponent(id)),
+    events: () => request('/events'),
+    event: (id) => request('/events/' + encodeURIComponent(id)),
+    committee: () => request('/committee'),
+    milestones: () => request('/milestones'),
+    settings: () => request('/settings'),
+    community: () => request('/community'),
+    albums: () => request('/albums'),
+    membershipInfo: () => request('/membership/info'),
+    applyMembership: (formData) => request('/membership/applications', { method: 'POST', body: formData }),
+    membershipStatus: (reference, nic) => postJson('/membership/status', { reference_number: reference, nic_number: nic }),
+    renewalLookup: (number, nic) => postJson('/membership/renew/lookup', { membership_number: number, nic_number: nic }),
+    renewalView: (token) => request('/membership/renew/' + encodeURIComponent(token)),
+    submitRenewal: (token, formData) => request('/membership/renew/' + encodeURIComponent(token), { method: 'POST', body: formData }),
+    sendContact: notYetOpen
   };
 })();

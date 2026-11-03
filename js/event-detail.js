@@ -22,23 +22,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (event.photo_url) {
     const photo = document.getElementById('event-photo');
-    photo.innerHTML = `<img src="${esc(event.photo_url)}" alt="">`;
+    photo.innerHTML = `<img src="${SLICNA.media(event.photo_url)}" alt="">`;
     photo.hidden = false;
   }
 
-  document.getElementById('event-body').innerHTML = event.body || `<p>${esc(event.summary || '')}</p>`;
+  document.getElementById('event-body').innerHTML = SLICNA.paragraphs(event.body || event.summary);
 
   const facts = [
     ['Date', SLICNA.formatDate(event.event_date) + (event.end_date ? ' – ' + SLICNA.formatDate(event.end_date) : '')],
-    ['Time', event.time],
+    ['Time', event.time_text],
     ['Venue', event.location],
-    ['CPD points', event.cpd_points ? Number(event.cpd_points).toFixed(2) : null]
+    ['CPD points', event.cpd_points != null ? Number(event.cpd_points).toFixed(2) : null]
   ].filter(([, v]) => v);
   document.getElementById('event-facts').innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('');
 
-  if (SLICNA.isUpcoming(event) && event.registration_open !== false) {
-    document.getElementById('register-card').hidden = false;
-    SLICNA_FORMS.bind('register-form', 'register-status', (data) => SLICNA_API.registerEvent(event.id, data),
-      'You are registered. We will contact you with joining details before the event.');
-  }
+  // Online event registration is not part of this release; the form stays hidden.
 });

@@ -49,8 +49,22 @@ const SLICNA = (() => {
       </a>`;
   }
 
+  // Plain text from the admin panel -> escaped paragraphs (blank line = new paragraph).
+  function paragraphs(text) {
+    return String(text || '')
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+      .join('');
+  }
+
+  function media(url) {
+    return escapeHtml(SLICNA_API.mediaUrl(url));
+  }
+
   function newsCard(item, lead = false) {
-    const img = item.photo_url ? `<img src="${escapeHtml(item.photo_url)}" alt="" loading="lazy">` : '';
+    const img = item.photo_url ? `<img src="${media(item.photo_url)}" alt="" loading="lazy">` : '';
     return `
       <a class="news-card${lead ? ' is-lead' : ''}" href="/pages/news-detail.html?id=${encodeURIComponent(item.id)}">
         <div class="thumb">${img}</div>
@@ -132,5 +146,5 @@ const SLICNA = (() => {
     document.querySelectorAll('[data-year]').forEach((el) => { el.textContent = new Date().getFullYear(); });
   });
 
-  return { escapeHtml, formatDate, parseDate, isUpcoming, formatPoints, eventRow, newsCard, CATEGORY_LABELS };
+  return { escapeHtml, formatDate, parseDate, isUpcoming, formatPoints, eventRow, newsCard, paragraphs, media, CATEGORY_LABELS };
 })();

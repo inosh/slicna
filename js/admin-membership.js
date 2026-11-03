@@ -1,0 +1,835 @@
+// Admin: membership applications, member directory, renewals and settings.
+// Uses the shared helpers from admin.js (window.SLICNA_ADMIN). Every action
+// that changes something asks for confirmation first.
+(() => {
+  const A = window.SLICNA_ADMIN;
+  if (!A) return;
+  const { api, esc, fmtDate, today, toast, confirmDialog, openForm, infoDialog } = A;
+
+  const BASE = '/membership/admin';
+  const CATEGORIES = { LT: 'Lifetime', GM: 'General', OM: 'Ordinary', PM: 'Partial' };
+  const CATEGORY_OPTIONS = Object.entries(CATEGORIES).map(([k, v]) => [k, `${v} (${k})`]);
+  const APP_STATUS = { pending: 'Pending', under_review: 'Under review', more_info_required: 'More info needed', approved: 'Approved', rejected: 'Rejected' };
+  const MEMBER_STATE = { active: 'Active', renewal_due: 'Renewal due', grace: 'Grace period', lapsed: 'Lapsed', deactivated: 'Deactivated' };
+  const REMINDER_KINDS = { notice_30: 'First reminder', notice_7: '7-day reminder', expired: 'Expired (grace started)', grace_ending: 'Grace ending', lapsed: 'Lapsed notice' };
+
+  const money = (n) => 'LKR ' + Number(n).toLocaleString('en-LK', { maximumFractionDigits: 2 });
+  // "YYYY-MM-DD" one year later (29 Feb -> 28 Feb), matching the backend.
+  const addYear = (d) => {
+    const [y, m, day] = String(d).split('-').map(Number);
+    const last = new Date(Date.UTC(y + 1, m, 0)).getUTCDate();
+    return `${y + 1}-${String(m).padStart(2, '0')}-${String(Math.min(day, last)).padStart(2, '0')}`;
+  };
+  const chip = (status, label) => `<span class="status-chip status-${esc(status)}">${esc(label)}</span>`;
+  const dl = (rows) => `<dl class="detail-list">${rows.filter(([, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => `<dt>${esc(k)}</dt><dd>${typeof v === 'object' ? v.html : esc(v)}</dd>`).join('')}</dl>`;
+  const html = (s) => ({ html: s });
+  const fmtDateTime = (v) => (v ? new Date(v).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+
+  // Document tile with a preview for images; click opens the file in a new tab.
+  async function docTiles(container, docs) {
+    const objectUrls = [];
+    container.innerHTML = docs.length ? `<div class="doc-tiles">${docs.map((d, i) => `
+      <div class="doc-tile">
+        <button type="button" class="doc-preview" data-doc="${i}" title="Open ${esc(d.label)}">Loading…</button>
+        <div class="doc-label">${esc(d.label)} <button type="button" class="copy-btn" data-doc="${i}">Open</button></div>
+      </div>`).join('')}</div>` : '<p class="admin-muted">No documents.</p>';
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-doc]');
+      if (btn) A.openPrivateFile(docs[Number(btn.dataset.doc)].path);
+    });
+    await Promise.all(docs.map(async (d, i) => {
+      const preview = container.querySelector(`.doc-preview[data-doc="${i}"]`);
+      try {
+        const blob = await A.apiBlob(d.path);
+        if (blob.type.startsWith('image/')) {
+          const url = URL.createObjectURL(blob);
+          objectUrls.push(url);
+          preview.innerHTML = `<img src="${url}" alt="">`;
+        } else {
+          preview.textContent = blob.type === 'application/pdf' ? 'PDF document' : 'File';
+        }
+      } catch (err) {
+        preview.textContent = 'Could not load';
+      }
+    }));
+    return () => objectUrls.forEach((u) => URL.revokeObjectURL(u));
+  }
+
+  function filterBar(host, { chips, chipKey, selects = [], search = true, onChange, actions = '' }) {
+    const state = { [chipKey]: chips[0][0] };
+    host.innerHTML = `
+      <div class="admin-filters">
+        ${chips.map(([v, label], i) => `<button type="button" class="chip" data-chip="${esc(v)}" aria-pressed="${i === 0}">${esc(label)}</button>`).join('')}
+        ${selects.map((s) => `<select data-select="${s.key}" aria-label="${esc(s.label)}"><option value="">${esc(s.label)}: all</option>${s.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>`).join('')}
+        ${search ? '<input type="search" data-search placeholder="Search name, NIC, number…" aria-label="Search">' : ''}
+        ${actions}
+      </div>`;
+    let timer = null;
+    host.addEventListener('click', (e) => {
+      const c = e.target.closest('[data-chip]');
+      if (!c) return;
+      host.querySelectorAll('[data-chip]').forEach((b) => b.setAttribute('aria-pressed', String(b === c)));
+      state[chipKey] = c.dataset.chip;
+      onChange(state);
+    });
+    host.addEventListener('change', (e) => {
+      const s = e.target.closest('[data-select]');
+      if (s) { state[s.dataset.select] = s.value; onChange(state); }
+    });
+    host.addEventListener('input', (e) => {
+      if (!e.target.matches('[data-search]')) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => { state.q = e.target.value.trim(); onChange(state); }, 300);
+    });
+    return state;
+  }
+
+  const query = (obj) => {
+    const p = new URLSearchParams();
+    Object.entries(obj).forEach(([k, v]) => { if (v && v !== 'all') p.set(k, v); });
+    const s = p.toString();
+    return s ? '?' + s : '';
+  };
+
+  // =====================================================================
+  // Applications
+  // =====================================================================
+
+  function renderApplications(main) {
+    const card = document.createElement('section');
+    card.className = 'admin-card';
+    main.appendChild(card);
+    card.innerHTML = '<div class="admin-card-head"><div><h2>Membership applications</h2><p>Click an application to review its details, photo, payment slip and recommendation.</p></div></div><div data-filters></div><div data-list></div>';
+    const listEl = card.querySelector('[data-list]');
+
+    const filters = filterBar(card.querySelector('[data-filters]'), {
+      chipKey: 'status',
+      chips: [['open', 'Needs action'], ['pending', 'Pending'], ['under_review', 'Under review'], ['more_info_required', 'More info needed'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['all', 'All']],
+      selects: [{ key: 'category', label: 'Category', options: CATEGORY_OPTIONS }],
+      onChange: load,
+    });
+
+    async function load() {
+      listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
+      try {
+        const status = filters.status === 'open' ? '' : filters.status;
+        let rows = await api('GET', `${BASE}/applications${query({ status, category: filters.category, q: filters.q })}`);
+        if (filters.status === 'open') rows = rows.filter((r) => ['pending', 'under_review'].includes(r.status));
+        listEl.innerHTML = rows.length ? `
+          <div class="admin-table-wrap"><table class="admin-table">
+            <thead><tr><th>Received</th><th>Reference</th><th>Applicant</th><th>Category</th><th>Status</th></tr></thead>
+            <tbody>${rows.map((r) => `
+              <tr class="is-clickable" data-id="${r.id}" tabindex="0">
+                <td>${esc(fmtDate(r.created_at))}</td>
+                <td>${esc(r.reference_number)}</td>
+                <td class="main-col">${esc(r.name_with_initials)}<div class="admin-muted">${esc(r.nic_number)} · ${esc(r.current_working_place || '')}</div></td>
+                <td>${esc(CATEGORIES[r.category])} (${esc(r.category)})</td>
+                <td>${chip(r.status, APP_STATUS[r.status])}</td>
+              </tr>`).join('')}</tbody>
+          </table></div>` : '<p class="admin-empty">No applications here.</p>';
+      } catch (err) {
+        listEl.innerHTML = `<p class="admin-empty">${esc(err.message)}</p>`;
+      }
+    }
+
+    listEl.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr[data-id]');
+      if (tr) reviewApplication(Number(tr.dataset.id), load);
+    });
+    listEl.addEventListener('keydown', (e) => {
+      const tr = e.target.closest('tr[data-id]');
+      if (tr && e.key === 'Enter') reviewApplication(Number(tr.dataset.id), load);
+    });
+    load();
+  }
+
+  async function reviewApplication(id, onChanged) {
+    let cleanup = () => {};
+    const view = infoDialog({ title: 'Application', onClose: () => cleanup() });
+    view.body.innerHTML = '<p class="admin-muted">Loading…</p>';
+    let a;
+    try {
+      a = await api('GET', `${BASE}/applications/${id}`);
+    } catch (err) {
+      view.body.innerHTML = `<p class="admin-empty">${esc(err.message)}</p>`;
+      return;
+    }
+    view.dialog.querySelector('.dialog-head h2').textContent = `${a.reference_number} · ${CATEGORIES[a.category]} (${a.category})`;
+    const isPm = a.category === 'PM';
+
+    let endorserBadge = '';
+    if (a.endorser_check) {
+      const c = a.endorser_check;
+      endorserBadge = !c.found
+        ? '<span class="check-badge check-bad">LT number not found in the member directory</span>'
+        : !c.is_lifetime
+          ? `<span class="check-badge check-bad">${esc(c.membership_number)} is not a Lifetime member</span>`
+          : `<span class="check-badge ${c.active ? 'check-ok' : 'check-warn'}">${esc(c.membership_number)}: ${esc(c.name)}${c.active ? '' : ' (deactivated)'}</span>`;
+    }
+
+    const locked = a.status === 'approved';
+    view.body.innerHTML = `
+      <div class="detail-grid">
+        <div>
+          <div class="detail-section"><h3>Applicant</h3>${dl([
+            ['Name', `${a.title || ''} ${a.full_name}`], ['Name with initials', a.name_with_initials], ['NIC', a.nic_number],
+            ['Date of birth', fmtDate(a.date_of_birth)], ['Sex', a.sex], ['Marital status', a.marital_status],
+            ['Email', a.email], ['Mobile', a.mobile], ['WhatsApp', a.whatsapp], ['Residential phone', a.residential_phone], ['Office phone', a.office_phone],
+            ['Permanent address', a.permanent_address],
+          ])}</div>
+          <div class="detail-section"><h3>${isPm ? 'Studies' : 'Nursing'}</h3>${dl([
+            ['SLNC registration', isPm ? '' : a.slnc_not_registered ? 'Not registered yet (ticked by applicant)' : [a.slnc_number, fmtDate(a.slnc_date)].filter(Boolean).join(' · ')],
+            ['SLNA membership', a.slna_not_member ? 'No SLNA number yet (ticked by applicant)' : [a.slna_number, fmtDate(a.slna_date)].filter(Boolean).join(' · ')],
+            [isPm ? 'Institution' : 'Working place', a.current_working_place], ['Official address', a.official_address], ['Designation', a.designation],
+            ['Nursing school', [a.nursing_school, a.batch && 'batch ' + a.batch].filter(Boolean).join(', ')],
+            ['First appointment', [fmtDate(a.first_appointment_date), a.first_appointment_place].filter(Boolean).join(', ')],
+            ['Student number', a.student_number], ['Registered at institute', fmtDate(a.institute_registration_date)],
+            ['ICU training', [a.icu_training_type, a.icu_training_batch, a.icu_training_year].filter(Boolean).join(', ')],
+            ['Higher qualifications', a.higher_qualifications],
+          ])}</div>
+          ${a.category !== 'LT' ? `<div class="detail-section"><h3>${isPm ? 'Institution certification' : 'Recommended by'}</h3>${dl(isPm ? [
+            ['Institution', a.endorser_workplace], ['Signing officer', [a.endorser_name, a.endorser_designation].filter(Boolean).join(', ')], ['Contact', a.endorser_contact],
+          ] : [
+            ['Lifetime member', a.endorser_name], ['LT number', html(`${esc(a.endorser_membership_number)}<br>${endorserBadge}`)],
+            ['Contact', a.endorser_contact], ['Workplace', a.endorser_workplace],
+          ])}</div>` : ''}
+          <div class="detail-section"><h3>Payment</h3>${dl([
+            ['Fee due', a.payment_amount != null ? money(a.payment_amount) : ''], ['Paid on', fmtDate(a.payment_date)],
+            ['Reference', 'Applicant was asked to quote their NIC: ' + a.nic_number],
+          ])}</div>
+        </div>
+        <div>
+          <div class="detail-section"><h3>Status</h3>
+            <p>${chip(a.status, APP_STATUS[a.status])}</p>
+            ${dl([
+              ['Received', fmtDateTime(a.created_at)],
+              ['Last reviewed', a.reviewed_at ? `${fmtDateTime(a.reviewed_at)}${a.reviewed_by_name ? ' by ' + a.reviewed_by_name : ''}` : ''],
+              ['Message to applicant', a.status_note], ['Internal notes', a.admin_notes],
+              ['Member', a.member ? `${a.member.membership_number}${a.member.valid_until ? ' · valid until ' + fmtDate(a.member.valid_until) : ' · lifetime'}` : ''],
+            ])}
+          </div>
+          <div class="detail-section"><h3>Documents</h3><div data-docs></div></div>
+          <div class="action-bar">
+            ${locked ? `<button type="button" class="btn btn-teal btn-sm" data-act="open-member">Open member</button>` : `
+              ${['pending', 'more_info_required'].includes(a.status) ? '<button type="button" class="btn btn-light btn-sm" data-act="review">Mark under review</button>' : ''}
+              <button type="button" class="btn btn-light btn-sm" data-act="info">Request more info</button>
+              <button type="button" class="btn btn-teal btn-sm" data-act="approve">Approve…</button>
+              <button type="button" class="btn btn-light btn-sm" data-act="reject">Reject…</button>
+              <button type="button" class="btn btn-danger btn-sm" data-act="delete">Delete</button>`}
+          </div>
+        </div>
+      </div>`;
+
+    const docs = [{ label: 'Photo', path: `${BASE}/applications/${a.id}/files/photo` }, { label: 'Payment slip', path: `${BASE}/applications/${a.id}/files/receipt` }];
+    if (a.endorsement_key) docs.push({ label: isPm ? 'Certified page' : 'Signed recommendation', path: `${BASE}/applications/${a.id}/files/endorsement` });
+    docTiles(view.body.querySelector('[data-docs]'), docs.filter((d, i) => i > 1 || (i === 0 ? a.photo_key : a.receipt_key))).then((c) => { cleanup = c; });
+
+    const done = (message) => {
+      toast(message);
+      view.close();
+      onChanged();
+      A.refreshBadges();
+    };
+    const patch = (fd) => api('PATCH', `${BASE}/applications/${a.id}/status`, fd);
+    const fdOf = (obj) => { const f = new FormData(); Object.entries(obj).forEach(([k, v]) => f.append(k, v)); return f; };
+
+    view.body.querySelector('.action-bar').addEventListener('click', async (e) => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (!act) return;
+
+      if (act === 'open-member') {
+        view.close();
+        memberDetail(a.member.id, () => {});
+      } else if (act === 'review') {
+        if (!(await confirmDialog({ title: 'Mark as under review?', message: `The applicant will see that "${a.reference_number}" is being reviewed${a.email ? ' and get an email' : ''}.`, confirmText: 'Mark under review' }))) return;
+        try {
+          await patch(fdOf({ status: 'under_review', status_note: '' }));
+          done('Marked as under review.');
+        } catch (err) { toast(err.message, true); }
+      } else if (act === 'info') {
+        const ok = await openForm({
+          title: 'Request more information',
+          fields: [
+            { name: 'status_note', label: 'What do you need from the applicant?', type: 'textarea', required: true, rows: 4, hint: 'Shown on their status page and emailed to them.' },
+            { name: 'admin_notes', label: 'Internal notes', type: 'textarea', rows: 2, hint: 'Only visible to admins.' },
+          ],
+          values: { admin_notes: a.admin_notes },
+          hidden: { status: 'more_info_required' },
+          saveLabel: 'Send request',
+          confirmTitle: 'Request more information?',
+          confirmMessage: `The application will be marked "More info needed" and ${a.name_with_initials} will be asked for the information.`,
+          submit: patch,
+        });
+        if (ok) done('More information requested.');
+      } else if (act === 'reject') {
+        const ok = await openForm({
+          title: 'Reject application',
+          fields: [
+            { name: 'status_note', label: 'Reason (shown to the applicant)', type: 'textarea', required: true, rows: 4 },
+            { name: 'admin_notes', label: 'Internal notes', type: 'textarea', rows: 2 },
+          ],
+          values: { admin_notes: a.admin_notes },
+          hidden: { status: 'rejected' },
+          saveLabel: 'Reject application',
+          confirmTitle: 'Reject this application?',
+          confirmMessage: `${a.name_with_initials} will be told the application was not approved, with your reason.`,
+          submit: patch,
+        });
+        if (ok) done('Application rejected.');
+      } else if (act === 'approve') {
+        let suggestion = '';
+        try { suggestion = (await api('GET', `${BASE}/next-number?category=${a.category}`)).membership_number; } catch (err) { /* type it in */ }
+        // Annual memberships: the start date defaults to the day the application
+        // was submitted; the admin can change it. Lifetime has no end, so no start date is asked.
+        const isLt = a.category === 'LT';
+        const submittedOn = new Date(a.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Colombo' });
+        const ok = await openForm({
+          title: 'Approve application',
+          fields: [
+            { name: 'membership_number', label: 'Membership number', required: true, half: true, hint: `Suggested next ${a.category} number. Format: ${a.category} 0000/YY.` },
+            ...(isLt ? [] : [{ name: 'joined_on', label: 'Membership starts on', type: 'date', required: true, half: true, hint: `Defaults to the date the application was submitted (${fmtDate(submittedOn)}). Valid for 12 months from this date.` }]),
+            { name: 'status_note', label: 'Welcome message (optional)', type: 'textarea', rows: 3, hint: 'Included in the approval email.' },
+          ],
+          values: { membership_number: suggestion, joined_on: submittedOn },
+          hidden: { status: 'approved' },
+          saveLabel: 'Approve',
+          confirmTitle: 'Approve and create the member?',
+          confirmMessage: (fd) => {
+            const validity = isLt
+              ? 'Lifetime membership, starting today.'
+              : `Membership from ${fmtDate(fd.get('joined_on'))} until ${fmtDate(addYear(fd.get('joined_on')))}.`;
+            return `${a.name_with_initials} becomes a ${CATEGORIES[a.category]} member (${fd.get('membership_number')}).\n${validity}\n\nThey will be emailed their membership number. An approved application can no longer be changed.`;
+          },
+          submit: patch,
+        });
+        if (ok) done('Application approved and member created.');
+      } else if (act === 'delete') {
+        if (!(await confirmDialog({ title: 'Delete application?', message: `${a.reference_number} (${a.name_with_initials}) and its photo, payment slip and documents will be permanently deleted.\n\nThis cannot be undone.`, confirmText: 'Delete', danger: true }))) return;
+        try {
+          await api('DELETE', `${BASE}/applications/${a.id}`);
+          done('Application deleted.');
+        } catch (err) { toast(err.message, true); }
+      }
+    });
+  }
+
+  // =====================================================================
+  // Members
+  // =====================================================================
+
+  const MEMBER_FIELDS = [
+    { name: 'category', label: 'Category', type: 'select', required: true, half: true, options: CATEGORY_OPTIONS },
+    { name: 'membership_number', label: 'Membership number', required: true, half: true },
+    { name: 'title', label: 'Title', type: 'select', half: true, options: [['', 'Select title'], ...['Prof.', 'Dr.', 'Mr.', 'Miss.', 'Mrs.'].map((t) => [t, t])] },
+    { name: 'sex', label: 'Sex', type: 'select', half: true, options: [['', '—'], ['Female', 'Female'], ['Male', 'Male']] },
+    { name: 'full_name', label: 'Name in full', required: true },
+    { name: 'name_with_initials', label: 'Name with initials', required: true, half: true },
+    { name: 'nic_number', label: 'NIC number', required: true, half: true },
+    { name: 'date_of_birth', label: 'Date of birth', type: 'date', half: true },
+    { name: 'email', label: 'Email', half: true },
+    { name: 'mobile', label: 'Mobile', half: true, hint: '07XXXXXXXX or +947XXXXXXXX' },
+    { name: 'whatsapp', label: 'WhatsApp', half: true },
+    { name: 'current_working_place', label: 'Working place', half: true },
+    { name: 'designation', label: 'Designation', half: true },
+    { name: 'joined_on', label: 'Member since', type: 'date', required: true, half: true },
+    { name: 'valid_until', label: 'Valid until', type: 'date', half: true, hint: 'Ignored for Lifetime. If empty: one year from "Member since".' },
+    { name: 'admin_notes', label: 'Internal notes', type: 'textarea', rows: 2 },
+  ];
+
+  async function suggestionsHint() {
+    try {
+      const nums = await Promise.all(Object.keys(CATEGORIES).map((c) => api('GET', `${BASE}/next-number?category=${c}`)));
+      return 'Next free: ' + nums.map((n) => n.membership_number).join(' · ');
+    } catch (err) {
+      return '';
+    }
+  }
+
+  function renderMembers(main) {
+    const card = document.createElement('section');
+    card.className = 'admin-card';
+    main.appendChild(card);
+    card.innerHTML = `
+      <div class="admin-card-head"><div><h2>Member directory</h2><p>Statuses are worked out from each member's "valid until" date and the grace period, so lapsing happens automatically.</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-light btn-sm" data-export>Export CSV</button>
+          <button type="button" class="btn btn-coral btn-sm" data-add>Add member</button>
+        </div></div>
+      <div class="stat-tiles" data-tiles></div>
+      <div data-filters></div>
+      <div data-list></div>`;
+    const listEl = card.querySelector('[data-list]');
+    const tilesEl = card.querySelector('[data-tiles]');
+    const filters = filterBar(card.querySelector('[data-filters]'), {
+      chipKey: 'state',
+      chips: [['', 'All'], ['active', 'Active'], ['renewal_due', 'Renewal due'], ['grace', 'Grace period'], ['lapsed', 'Lapsed'], ['pending_renewal', 'Renewal pending'], ['deactivated', 'Deactivated']],
+      selects: [{ key: 'category', label: 'Category', options: CATEGORY_OPTIONS }],
+      onChange: load,
+    });
+
+    async function loadTiles() {
+      try {
+        const o = await api('GET', `${BASE}/overview`);
+        tilesEl.innerHTML = [
+          ['', o.members.total, 'Members'], ['active', o.members.active, 'Active'], ['renewal_due', o.members.renewal_due, 'Renewal due'],
+          ['grace', o.members.grace, 'Grace period'], ['lapsed', o.members.lapsed, 'Lapsed'], ['pending_renewal', o.pending_renewals, 'Renewals to verify'],
+        ].map(([state, n, label]) => `<button type="button" class="stat-tile" data-tile="${state}"><b>${esc(n)}</b><span>${esc(label)}</span></button>`).join('');
+      } catch (err) { tilesEl.innerHTML = ''; }
+    }
+    tilesEl.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-tile]');
+      if (!t) return;
+      card.querySelector(`[data-chip="${t.dataset.tile}"]`).click();
+    });
+
+    async function load() {
+      listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
+      try {
+        const rows = await api('GET', `${BASE}/members${query({ state: filters.state, category: filters.category, q: filters.q })}`);
+        listEl.innerHTML = rows.length ? `
+          <p class="admin-muted">${rows.length} member${rows.length === 1 ? '' : 's'}</p>
+          <div class="admin-table-wrap"><table class="admin-table">
+            <thead><tr><th>Number</th><th>Member</th><th>Category</th><th>Valid until</th><th>Status</th></tr></thead>
+            <tbody>${rows.map((m) => `
+              <tr class="is-clickable" data-id="${m.id}" tabindex="0">
+                <td style="white-space:nowrap">${esc(m.membership_number)}</td>
+                <td class="main-col">${esc(m.name_with_initials)}<div class="admin-muted">${esc(m.nic_number)}${m.mobile ? ' · ' + esc(m.mobile) : ''}</div></td>
+                <td>${esc(CATEGORIES[m.category])}</td>
+                <td>${m.valid_until ? esc(fmtDate(m.valid_until)) : 'Lifetime'}</td>
+                <td>${chip(m.state, MEMBER_STATE[m.state])}${m.has_pending_renewal ? '<div class="admin-muted" style="margin-top:4px">Renewal pending</div>' : ''}</td>
+              </tr>`).join('')}</tbody>
+          </table></div>` : '<p class="admin-empty">No members here yet.</p>';
+      } catch (err) {
+        listEl.innerHTML = `<p class="admin-empty">${esc(err.message)}</p>`;
+      }
+    }
+    const reload = () => { load(); loadTiles(); A.refreshBadges(); };
+
+    listEl.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr[data-id]');
+      if (tr) memberDetail(Number(tr.dataset.id), reload);
+    });
+    listEl.addEventListener('keydown', (e) => {
+      const tr = e.target.closest('tr[data-id]');
+      if (tr && e.key === 'Enter') memberDetail(Number(tr.dataset.id), reload);
+    });
+
+    card.querySelector('[data-export]').onclick = () =>
+      A.downloadPrivateFile(`${BASE}/members/export.csv${query({ state: filters.state, category: filters.category, q: filters.q })}`, `slicna-members-${today()}.csv`);
+
+    card.querySelector('[data-add]').onclick = async () => {
+      const hint = await suggestionsHint();
+      const fields = MEMBER_FIELDS.map((f) => (f.name === 'membership_number' ? { ...f, hint } : f));
+      const ok = await openForm({
+        title: 'Add member',
+        fields,
+        image: { column: 'photo_preview', field: 'photo', label: 'Photo', allowRemove: false },
+        values: { category: 'GM', joined_on: today() },
+        saveLabel: 'Add member',
+        confirmTitle: 'Add this member?',
+        confirmMessage: 'The member will be added to the directory. Use this for members who joined on paper.',
+        submit: (fd) => api('POST', `${BASE}/members`, fd),
+      });
+      if (ok) { toast('Member added.'); reload(); }
+    };
+
+    reload();
+  }
+
+  async function memberDetail(id, onChanged) {
+    let photoUrl = null;
+    const view = infoDialog({ title: 'Member', onClose: () => { if (photoUrl) URL.revokeObjectURL(photoUrl); } });
+    view.body.innerHTML = '<p class="admin-muted">Loading…</p>';
+    let m;
+    try {
+      m = await api('GET', `${BASE}/members/${id}`);
+    } catch (err) {
+      view.body.innerHTML = `<p class="admin-empty">${esc(err.message)}</p>`;
+      return;
+    }
+    if (m.has_photo) {
+      try { photoUrl = URL.createObjectURL(await A.apiBlob(`${BASE}/members/${m.id}/photo`)); } catch (err) { /* no photo */ }
+    }
+    view.dialog.querySelector('.dialog-head h2').textContent = `${m.membership_number} · ${m.name_with_initials}`;
+    const isLt = m.category === 'LT';
+
+    view.body.innerHTML = `
+      <div class="detail-grid">
+        <div>
+          <div class="detail-section"><h3>Membership</h3>${dl([
+            ['Number', m.membership_number], ['Category', `${CATEGORIES[m.category]} (${m.category})`],
+            ['Status', html(chip(m.state, MEMBER_STATE[m.state]) + (m.has_pending_renewal ? ' <span class="admin-muted">Renewal pending</span>' : ''))],
+            ['Member since', fmtDate(m.joined_on)], ['Valid until', m.valid_until ? fmtDate(m.valid_until) : 'Lifetime'],
+            ['Grace period ends', m.grace_ends ? fmtDate(m.grace_ends) : ''],
+            ['Deactivated', m.deactivated_at ? `${fmtDate(m.deactivated_at)}: ${m.deactivated_reason}` : ''],
+            ['Joined through', m.source === 'manual' ? 'Added by an admin' : m.application ? `Application ${m.application.reference_number}` : 'Application'],
+            ['ID application', m.id_application_created_at ? `Created ${fmtDate(m.id_application_created_at)}` : 'Not yet created'],
+          ])}</div>
+          <div class="detail-section"><h3>Details</h3>${dl([
+            ['Name', `${m.title || ''} ${m.full_name}`], ['NIC', m.nic_number], ['Date of birth', fmtDate(m.date_of_birth)], ['Sex', m.sex],
+            ['Email', m.email], ['Mobile', m.mobile], ['WhatsApp', m.whatsapp], ['Working place', m.current_working_place], ['Designation', m.designation],
+            ['Internal notes', m.admin_notes],
+          ])}</div>
+          <div class="detail-section"><h3>Payments &amp; renewals</h3>${m.renewals.length ? `<ul class="history-list">${m.renewals.map((r) => `
+            <li>${chip(r.status, { pending: 'Pending', verified: 'Verified', rejected: 'Rejected' }[r.status])}
+              <strong>${r.kind === 'upgrade' ? 'Upgrade to LT' : 'Renewal'}</strong> · ${esc(money(r.amount))} · ref ${esc(r.payment_reference)}
+              <div class="admin-muted">${r.recorded_by_admin ? 'Recorded by admin' : 'Submitted online'} ${esc(fmtDate(r.created_at))}${r.new_valid_until ? ' · valid until ' + esc(fmtDate(r.new_valid_until)) : ''}${r.reviewed_by_name ? ' · by ' + esc(r.reviewed_by_name) : ''}${r.status_note ? ' · ' + esc(r.status_note) : ''}</div>
+            </li>`).join('')}</ul>` : '<p class="admin-muted">None yet.</p>'}</div>
+          ${!isLt ? `<div class="detail-section"><h3>Reminder emails</h3>${m.reminders.length ? `<ul class="history-list">${m.reminders.map((r) => `
+            <li><strong>${esc(REMINDER_KINDS[r.kind] || r.kind)}</strong> · ${esc(r.status)} · ${esc(fmtDateTime(r.created_at))}${r.detail ? `<div class="admin-muted">${esc(r.detail)}</div>` : ''}</li>`).join('')}</ul>` : '<p class="admin-muted">None sent yet.</p>'}</div>` : ''}
+        </div>
+        <div>
+          <div class="detail-section"><h3>Photo</h3>${photoUrl ? `<img src="${photoUrl}" alt="" style="width:160px;border-radius:12px">` : '<p class="admin-muted">No photo.</p>'}</div>
+          <div class="action-bar" style="flex-direction:column;align-items:stretch">
+            <button type="button" class="btn btn-light btn-sm" data-act="edit">Edit details</button>
+            ${!isLt && m.state !== 'deactivated' ? '<button type="button" class="btn btn-light btn-sm" data-act="link">Renewal link…</button>' : ''}
+            ${!isLt && m.state !== 'deactivated' ? '<button type="button" class="btn btn-teal btn-sm" data-act="payment">Record a payment…</button>' : ''}
+            <button type="button" class="btn btn-light btn-sm" data-act="pdf">ID card application (PDF)</button>
+            ${m.id_application_created_at ? '' : '<button type="button" class="btn btn-light btn-sm" data-act="id-done">Mark ID application created</button>'}
+            ${m.state === 'deactivated'
+              ? '<button type="button" class="btn btn-teal btn-sm" data-act="reactivate">Reactivate</button>'
+              : '<button type="button" class="btn btn-danger btn-sm" data-act="deactivate">Deactivate…</button>'}
+          </div>
+        </div>
+      </div>`;
+
+    const refresh = (message) => {
+      toast(message);
+      view.close();
+      onChanged();
+      memberDetail(id, onChanged);
+    };
+
+    view.body.querySelector('.action-bar').addEventListener('click', async (e) => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (!act) return;
+
+      if (act === 'edit') {
+        const ok = await openForm({
+          title: 'Edit member',
+          fields: MEMBER_FIELDS,
+          image: { column: 'photo_preview', field: 'photo', label: 'Photo', allowRemove: false },
+          values: { ...m, photo_preview: photoUrl },
+          saveLabel: 'Save changes',
+          confirmTitle: 'Save changes?',
+          confirmMessage: `Changes to ${m.membership_number} will be saved.`,
+          submit: (fd) => api('PUT', `${BASE}/members/${m.id}`, fd),
+        });
+        if (ok) refresh('Member updated.');
+      } else if (act === 'link') {
+        renewalLinkDialog(m);
+      } else if (act === 'payment') {
+        let fees = {};
+        try { fees = Object.fromEntries((await api('GET', `${BASE}/settings`)).fees.map((f) => [f.category, f.amount])); } catch (err) { /* type it */ }
+        const ok = await openForm({
+          title: 'Record a payment',
+          fields: [
+            { name: 'kind', label: 'Payment for', type: 'select', required: true, half: true, options: [['renewal', `Renewal (${money(fees[m.category] || 0)})`], ['upgrade', `Upgrade to Lifetime (${money(fees.LT || 0)})`]] },
+            { name: 'amount', label: 'Amount received (LKR)', type: 'number', step: '0.01', required: true, half: true },
+            { name: 'payment_date', label: 'Payment date', type: 'date', required: true, half: true },
+            { name: 'payment_reference', label: 'Receipt / reference number', required: true, half: true },
+            { name: 'membership_number', label: 'New Lifetime number (upgrades only)', hint: 'Leave empty to use the next free LT number.' },
+            { name: 'status_note', label: 'Note', type: 'textarea', rows: 2 },
+          ],
+          values: { kind: 'renewal', amount: fees[m.category], payment_date: today() },
+          saveLabel: 'Record payment',
+          confirmTitle: 'Record this payment?',
+          confirmMessage: `The payment is marked as verified straight away and ${m.membership_number} is renewed (or upgraded). Use this for cash or slips handed in, not online submissions.`,
+          submit: (fd) => api('POST', `${BASE}/members/${m.id}/payments`, fd),
+        });
+        if (ok) refresh('Payment recorded.');
+      } else if (act === 'pdf') {
+        A.openPrivateFile(`${BASE}/members/${m.id}/id-application.pdf`);
+      } else if (act === 'id-done') {
+        if (!(await confirmDialog({ title: 'Mark ID application created?', message: `Records that the ID card application for ${m.membership_number} has been created.`, confirmText: 'Mark created' }))) return;
+        try {
+          await api('POST', `${BASE}/members/${m.id}/id-application`);
+          refresh('Marked as created.');
+        } catch (err) { toast(err.message, true); }
+      } else if (act === 'deactivate') {
+        const ok = await openForm({
+          title: 'Deactivate member',
+          fields: [{ name: 'reason', label: 'Reason', type: 'textarea', required: true, rows: 3, hint: 'Internal: for example "Resigned" or "Duplicate record".' }],
+          saveLabel: 'Deactivate',
+          confirmTitle: 'Deactivate this member?',
+          confirmMessage: `${m.membership_number} (${m.name_with_initials}) will be marked inactive and stop receiving reminders. The record is kept and can be reactivated.`,
+          submit: (fd) => api('POST', `${BASE}/members/${m.id}/deactivate`, fd),
+        });
+        if (ok) refresh('Member deactivated.');
+      } else if (act === 'reactivate') {
+        if (!(await confirmDialog({ title: 'Reactivate member?', message: `${m.membership_number} will be active again. Their status will follow their "valid until" date.`, confirmText: 'Reactivate' }))) return;
+        try {
+          await api('POST', `${BASE}/members/${m.id}/reactivate`);
+          refresh('Member reactivated.');
+        } catch (err) { toast(err.message, true); }
+      }
+    });
+  }
+
+  function renewalLinkDialog(m) {
+    const view = infoDialog({ title: 'Renewal link', wide: false });
+    view.body.innerHTML = `
+      <p>A personal link that opens ${esc(m.name_with_initials)}'s renewal page with their details filled in. It works for 90 days, and they confirm with the last 4 digits of their NIC.</p>
+      <div class="action-bar" style="border-top:0;margin-top:0;padding-top:0">
+        <button type="button" class="btn btn-light btn-sm" data-act="create">Create link to copy</button>
+        ${m.email ? `<button type="button" class="btn btn-teal btn-sm" data-act="email">Email link to ${esc(m.email)}</button>` : '<span class="admin-muted">No email address on record.</span>'}
+      </div>
+      <div data-result></div>`;
+    const result = view.body.querySelector('[data-result]');
+    view.body.addEventListener('click', async (e) => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (!act) return;
+      if (act === 'email' && !(await confirmDialog({ title: 'Email renewal link?', message: `A renewal reminder with a personal link will be emailed to ${m.email}.`, confirmText: 'Send email' }))) return;
+      try {
+        const fd = new FormData();
+        fd.append('send_email', act === 'email' ? 'true' : 'false');
+        const r = await api('POST', `${BASE}/members/${m.id}/renewal-link`, fd);
+        const emailNote = r.email
+          ? r.email.status === 'sent' ? '<p class="callout">Email sent.</p>' : `<p class="callout callout-warn">The email was not sent: ${esc(r.email.detail || r.email.status)}. You can copy the link below and send it by WhatsApp or SMS instead.</p>`
+          : '';
+        result.innerHTML = `${emailNote}<div class="copy-field"><input readonly value="${esc(r.url)}" aria-label="Renewal link"><button type="button" class="btn btn-light btn-sm" data-copy-link>Copy</button></div>`;
+        result.querySelector('[data-copy-link]').onclick = async (ev) => {
+          try { await navigator.clipboard.writeText(r.url); ev.target.textContent = 'Copied'; } catch (err) { result.querySelector('input').select(); }
+        };
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+  }
+
+  // =====================================================================
+  // Renewals
+  // =====================================================================
+
+  function renderRenewals(main) {
+    const card = document.createElement('section');
+    card.className = 'admin-card';
+    main.appendChild(card);
+    card.innerHTML = '<div class="admin-card-head"><div><h2>Renewals &amp; upgrades</h2><p>Check each payment slip against the bank statement (the member quoted the payment reference), then verify or reject it.</p></div></div><div data-filters></div><div data-list></div>';
+    const listEl = card.querySelector('[data-list]');
+    const filters = filterBar(card.querySelector('[data-filters]'), {
+      chipKey: 'status', search: false,
+      chips: [['pending', 'To verify'], ['verified', 'Verified'], ['rejected', 'Rejected'], ['all', 'All']],
+      onChange: load,
+    });
+    let rows = [];
+
+    async function load() {
+      listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
+      try {
+        rows = await api('GET', `${BASE}/renewals${query({ status: filters.status })}`);
+        listEl.innerHTML = rows.length ? `
+          <div class="admin-table-wrap"><table class="admin-table">
+            <thead><tr><th>Submitted</th><th>Member</th><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead>
+            <tbody>${rows.map((r) => `
+              <tr class="is-clickable" data-id="${r.id}" tabindex="0">
+                <td>${esc(fmtDate(r.created_at))}</td>
+                <td class="main-col">${esc(r.membership_number)}<div class="admin-muted">${esc(r.name_with_initials)}</div></td>
+                <td>${r.kind === 'upgrade' ? 'Upgrade to LT' : 'Renewal'}${r.recorded_by_admin ? '<div class="admin-muted">Recorded by admin</div>' : ''}</td>
+                <td>${esc(money(r.amount))}</td>
+                <td>${esc(r.payment_reference)}</td>
+                <td>${chip(r.status, { pending: 'To verify', verified: 'Verified', rejected: 'Rejected' }[r.status])}</td>
+              </tr>`).join('')}</tbody>
+          </table></div>` : `<p class="admin-empty">${filters.status === 'pending' ? 'Nothing to verify right now.' : 'No renewals here.'}</p>`;
+      } catch (err) {
+        listEl.innerHTML = `<p class="admin-empty">${esc(err.message)}</p>`;
+      }
+    }
+
+    const open = (id) => renewalDetail(rows.find((r) => r.id === id), () => { load(); A.refreshBadges(); });
+    listEl.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) open(Number(tr.dataset.id)); });
+    listEl.addEventListener('keydown', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr && e.key === 'Enter') open(Number(tr.dataset.id)); });
+    load();
+  }
+
+  async function renewalDetail(r, onChanged) {
+    let cleanup = () => {};
+    const view = infoDialog({ title: `${r.kind === 'upgrade' ? 'Upgrade' : 'Renewal'} · ${r.membership_number}`, onClose: () => cleanup() });
+    const changes = [['Email', r.email], ['Mobile', r.mobile], ['Working place', r.current_working_place]].filter(([, v]) => v);
+    view.body.innerHTML = `
+      <div class="detail-grid">
+        <div>
+          <div class="detail-section"><h3>Payment</h3>${dl([
+            ['Member', `${r.membership_number} · ${r.name_with_initials}`],
+            ['Type', r.kind === 'upgrade' ? `Upgrade ${r.from_category} → Lifetime` : `Renewal of ${CATEGORIES[r.from_category]}`],
+            ['Amount due', money(r.amount)], ['Payment reference', r.payment_reference], ['Paid on', fmtDate(r.payment_date)],
+            ['Submitted', fmtDateTime(r.created_at)],
+            ['Valid until (before)', r.previous_valid_until ? fmtDate(r.previous_valid_until) : ''],
+            ['Valid until (after)', r.new_valid_until ? fmtDate(r.new_valid_until) : r.status === 'pending' ? (r.kind === 'upgrade' ? 'Lifetime' : 'One year more, set when verified') : ''],
+            ['Status', html(chip(r.status, { pending: 'To verify', verified: 'Verified', rejected: 'Rejected' }[r.status]))],
+            ['Message to member', r.status_note],
+          ])}</div>
+          ${changes.length ? `<div class="detail-section"><h3>Contact details to update</h3>${dl(changes)}<p class="admin-muted">Applied to the member record when verified.</p></div>` : ''}
+        </div>
+        <div>
+          <div class="detail-section"><h3>Payment slip</h3><div data-docs></div></div>
+          ${r.status === 'pending' ? `<div class="action-bar">
+            <button type="button" class="btn btn-teal btn-sm" data-act="verify">Verify payment</button>
+            <button type="button" class="btn btn-light btn-sm" data-act="reject">Reject…</button>
+          </div>` : ''}
+          <p style="margin-top:12px"><button type="button" class="btn btn-light btn-sm" data-act="member">Open member</button></p>
+        </div>
+      </div>`;
+    if (r.has_receipt) docTiles(view.body.querySelector('[data-docs]'), [{ label: 'Payment slip', path: `${BASE}/renewals/${r.id}/receipt` }]).then((c) => { cleanup = c; });
+    else view.body.querySelector('[data-docs]').innerHTML = '<p class="admin-muted">No slip (recorded by an admin).</p>';
+
+    const done = (message) => { toast(message); view.close(); onChanged(); };
+    view.body.addEventListener('click', async (e) => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (!act) return;
+      if (act === 'member') {
+        view.close();
+        memberDetail(r.member_id, onChanged);
+      } else if (act === 'verify') {
+        if (r.kind === 'upgrade') {
+          let suggestion = '';
+          try { suggestion = (await api('GET', `${BASE}/next-number?category=LT`)).membership_number; } catch (err) { /* type it */ }
+          const ok = await openForm({
+            title: 'Verify upgrade to Lifetime',
+            fields: [{ name: 'membership_number', label: 'New Lifetime membership number', required: true, hint: `The member's current number is ${r.membership_number}.` }],
+            values: { membership_number: suggestion },
+            hidden: { status: 'verified' },
+            saveLabel: 'Verify and upgrade',
+            confirmTitle: 'Verify this payment and upgrade?',
+            confirmMessage: `Confirm you've matched ${money(r.amount)} (ref ${r.payment_reference}) on the bank statement. ${r.name_with_initials} becomes a Lifetime member and is emailed.`,
+            submit: (fd) => api('PATCH', `${BASE}/renewals/${r.id}`, fd),
+          });
+          if (ok) done('Upgrade verified.');
+          return;
+        }
+        if (!(await confirmDialog({ title: 'Verify this payment?', message: `Confirm you've matched ${money(r.amount)} (ref ${r.payment_reference}) on the bank statement.\n\n${r.membership_number} will be extended by 12 months and the member will be emailed.`, confirmText: 'Verify payment' }))) return;
+        try {
+          const fd = new FormData();
+          fd.append('status', 'verified');
+          await api('PATCH', `${BASE}/renewals/${r.id}`, fd);
+          done('Payment verified. Membership extended.');
+        } catch (err) { toast(err.message, true); }
+      } else if (act === 'reject') {
+        const ok = await openForm({
+          title: 'Reject payment',
+          fields: [{ name: 'status_note', label: 'Reason (sent to the member)', type: 'textarea', required: true, rows: 3, hint: 'For example: "The slip is unreadable" or "Payment not found on the statement".' }],
+          hidden: { status: 'rejected' },
+          saveLabel: 'Reject payment',
+          confirmTitle: 'Reject this payment?',
+          confirmMessage: `${r.name_with_initials} will be emailed your reason and asked to submit again. The membership is not changed.`,
+          submit: (fd) => api('PATCH', `${BASE}/renewals/${r.id}`, fd),
+        });
+        if (ok) done('Payment rejected.');
+      }
+    });
+  }
+
+  // =====================================================================
+  // Settings
+  // =====================================================================
+
+  function renderSettings(main) {
+    const card = document.createElement('section');
+    card.className = 'admin-card';
+    main.appendChild(card);
+
+    async function load() {
+      card.innerHTML = '<p class="admin-muted">Loading…</p>';
+      let s;
+      try { s = await api('GET', `${BASE}/settings`); } catch (err) {
+        card.innerHTML = `<p class="admin-empty">${esc(err.message)}</p>`;
+        return;
+      }
+      card.innerHTML = `
+        <div class="admin-card-head"><div><h2>Fees</h2><p>Shown on the membership pages and used for new applications and renewals.</p></div></div>
+        <div class="admin-table-wrap"><table class="admin-table">
+          <thead><tr><th>Category</th><th>Fee</th><th>Period</th><th></th></tr></thead>
+          <tbody>${s.fees.map((f) => `<tr><td class="main-col">${esc(f.label)} (${esc(f.category)})</td><td>${esc(money(f.amount))}</td><td>${f.is_annual ? 'Per year' : 'One-time'}</td>
+            <td><div class="row-actions"><button type="button" class="btn btn-light btn-sm" data-fee="${esc(f.category)}">Edit</button></div></td></tr>`).join('')}</tbody>
+        </table></div>
+
+        <div class="admin-card-head" style="margin-top:28px"><div><h2>Bank details &amp; renewals</h2></div>
+          <button type="button" class="btn btn-light btn-sm" data-edit-settings>Edit</button></div>
+        ${dl([
+          ['Bank', s.bank.bank_name], ['Account number', s.bank.account_number], ['Branch', s.bank.branch], ['Account name', s.bank.account_name],
+          ['First reminder', `${s.notice_days} days before expiry`], ['Grace period', `${s.grace_days} days after expiry`],
+        ])}
+
+        <div class="admin-card-head" style="margin-top:28px"><div><h2>Renewal reminder emails</h2>
+          <p>A daily scheduled job sends reminders (${s.notice_days} and 7 days before expiry, on expiry, 14 days before the grace period ends, and when a membership lapses). You can also run it now.</p></div>
+          <button type="button" class="btn btn-teal btn-sm" data-run>Send due reminders now</button></div>
+        ${s.email_configured ? '<p class="callout">Email sending is switched on.</p>' : '<p class="callout callout-warn"><strong>Email sending is not set up yet.</strong> Reminders and notifications are logged but not sent until a Resend API key is added to the backend. Meanwhile, use "Renewal link…" on a member to copy their link and send it by WhatsApp or SMS.</p>'}
+        <div data-run-result></div>`;
+
+      card.querySelectorAll('[data-fee]').forEach((btn) => {
+        btn.onclick = async () => {
+          const f = s.fees.find((x) => x.category === btn.dataset.fee);
+          const ok = await openForm({
+            title: `Edit fee: ${f.label}`,
+            fields: [{ name: 'amount', label: 'Fee (LKR)', type: 'number', step: '0.01', min: 0, required: true }],
+            values: { amount: f.amount },
+            saveLabel: 'Save fee',
+            confirmTitle: 'Change this fee?',
+            confirmMessage: `The new ${f.label} fee shows on the website straight away and applies to new applications and renewals.`,
+            submit: (fd) => api('PUT', `${BASE}/fees/${f.category}`, fd),
+          });
+          if (ok) { toast('Fee updated.'); load(); }
+        };
+      });
+
+      card.querySelector('[data-edit-settings]').onclick = async () => {
+        const ok = await openForm({
+          title: 'Bank details & renewals',
+          fields: [
+            { name: 'bank_name', label: 'Bank', required: true, half: true },
+            { name: 'bank_branch', label: 'Branch', required: true, half: true },
+            { name: 'bank_account_number', label: 'Account number', required: true, half: true },
+            { name: 'bank_account_name', label: 'Account name', required: true, half: true },
+            { name: 'membership_notice_days', label: 'First reminder (days before expiry)', type: 'number', min: 7, required: true, half: true },
+            { name: 'membership_grace_days', label: 'Grace period (days after expiry)', type: 'number', min: 0, required: true, half: true },
+          ],
+          values: {
+            bank_name: s.bank.bank_name, bank_branch: s.bank.branch, bank_account_number: s.bank.account_number, bank_account_name: s.bank.account_name,
+            membership_notice_days: s.notice_days, membership_grace_days: s.grace_days,
+          },
+          saveLabel: 'Save settings',
+          confirmTitle: 'Save these settings?',
+          confirmMessage: 'Bank details change on the website straight away. Reminder and grace period changes apply from the next daily run.',
+          submit: (fd) => api('PUT', `${BASE}/settings`, fd),
+        });
+        if (ok) { toast('Settings saved.'); load(); }
+      };
+
+      card.querySelector('[data-run]').onclick = async () => {
+        if (!(await confirmDialog({ title: 'Send due reminders now?', message: 'Members whose reminder is due today and hasn\'t been sent will get it now. Members are never sent the same reminder twice.', confirmText: 'Send reminders' }))) return;
+        const out = card.querySelector('[data-run-result]');
+        out.innerHTML = '<p class="admin-muted">Running…</p>';
+        try {
+          const r = await api('POST', `${BASE}/reminders/run`);
+          out.innerHTML = `<p class="callout" style="margin-top:12px">Checked ${r.checked} annual members: ${r.sent} sent, ${r.skipped} skipped, ${r.failed} failed.</p>
+            ${r.details.length ? `<ul class="history-list">${r.details.map((d) => `<li><strong>${esc(d.membership_number)}</strong> · ${esc(REMINDER_KINDS[d.kind] || d.kind)} · ${esc(d.status)}${d.detail ? ' · ' + esc(d.detail) : ''}</li>`).join('')}</ul>` : ''}`;
+        } catch (err) {
+          out.innerHTML = '';
+          toast(err.message, true);
+        }
+      };
+    }
+    load();
+  }
+
+  // =====================================================================
+  // Register
+  // =====================================================================
+
+  A.registerSection('applications', {
+    label: 'Applications', sub: 'Review new members', render: renderApplications,
+    intro: 'Review online applications: check the details, photo, payment slip and recommendation, then approve, ask for more information or reject.',
+  });
+  A.registerSection('members', {
+    label: 'Members', sub: 'Directory and renewals', render: renderMembers,
+    intro: 'Every member, with their status worked out from their "valid until" date.',
+  });
+  A.registerSection('renewals', {
+    label: 'Renewals', sub: 'Payments to verify', render: renderRenewals,
+    intro: 'Renewal and upgrade payments submitted by members through their renewal link.',
+  });
+  A.registerSection('membership-settings', {
+    label: 'Membership settings', sub: 'Fees, bank, reminders', render: renderSettings,
+    intro: 'Settings for membership fees, payment details and renewal reminders.',
+  });
+})();

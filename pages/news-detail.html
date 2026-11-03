@@ -31,7 +31,6 @@
 <div id="site-footer"></div>
 
 <script src="/js/config.js"></script>
-<script src="/js/demo-data.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/main.js"></script>
 <script>
@@ -50,11 +49,11 @@
     document.getElementById('article-date').textContent = SLICNA.formatDate(item.published_at || item.event_date);
     if (item.photo_url) {
       const photo = document.getElementById('article-photo');
-      photo.innerHTML = `<img src="${SLICNA.escapeHtml(item.photo_url)}" alt="">`;
+      photo.innerHTML = `<img src="${SLICNA.media(item.photo_url)}" alt="">`;
       photo.hidden = false;
     }
-    // Article bodies come from the admin editor; sanitise them once the backend serves real content.
-    document.getElementById('article-body').innerHTML = item.body || `<p>${SLICNA.escapeHtml(item.summary || '')}</p>`;
+    // Article text is plain text from the admin panel, escaped and split into paragraphs.
+    document.getElementById('article-body').innerHTML = SLICNA.paragraphs(item.body || item.summary);
   });
 </script>
 </body>

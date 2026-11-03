@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Application Status | SLICNA</title>
+  <meta name="description" content="Check the status of your SLICNA membership application.">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="membership">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="page-head" style="padding-bottom:24px">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / <a href="/pages/membership.html">Membership</a> / Application status</nav>
+      <p class="eyebrow">Membership</p>
+      <h1>Check your application</h1>
+      <p class="lede">Enter the reference number you received when you applied, and your NIC number.</p>
+    </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0">
+    <div class="wrap" style="max-width:760px">
+      <form class="form-card" id="status-form" novalidate>
+        <div class="form-grid">
+          <div class="field"><label for="ref">Reference number</label><input id="ref" name="reference" required placeholder="APP-XXXXXXXX" autocomplete="off"></div>
+          <div class="field"><label for="nic">NIC number</label><input id="nic" name="nic" required maxlength="12"></div>
+          <div class="full"><button class="btn btn-coral" type="submit">Check status</button></div>
+        </div>
+        <div class="form-status" id="status-error" role="status"></div>
+      </form>
+      <div id="status-result" style="margin-top:22px" aria-live="polite"></div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/membership-status.js"></script>
+</body>
+</html>
