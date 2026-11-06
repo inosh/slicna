@@ -36,16 +36,15 @@
           <div class="reg-step">
             <h2 class="form-legend">Are you a SLICNA member?</h2>
             <div class="choice-grid" id="type-choices">
-              <label class="choice"><input type="radio" name="registrant_type" value="member" required><span class="choice-box"><b>Yes, I'm a member</b><span class="choice-meta">We'll check your membership and apply your member fee.</span></span></label>
+              <label class="choice"><input type="radio" name="registrant_type" value="member" required><span class="choice-box"><b>Yes, I'm a member</b><span class="choice-meta">Enter your membership number for the member fee.</span></span></label>
               <label class="choice" id="non-member-choice"><input type="radio" name="registrant_type" value="non_member"><span class="choice-box"><b>No, I'm not a member</b><span class="choice-meta">Register at the non-member rate.</span></span></label>
             </div>
             <p class="muted members-only-note" id="members-only-note" hidden>This event is for SLICNA members only. Not a member yet? <a href="/pages/membership.html">Join SLICNA</a>.</p>
 
             <div class="member-check" id="member-check" hidden>
               <div class="form-grid">
-                <div class="field"><label for="membership_number">Membership number</label><input id="membership_number" name="membership_number" placeholder="e.g. GM 0012/25" autocomplete="off"></div>
-                <div class="field"><label for="member_nic">NIC number</label><input id="member_nic" maxlength="12" autocomplete="off" data-nic></div>
-                <div class="full"><button type="button" class="btn btn-teal" id="check-btn">Check my membership</button></div>
+                <div class="field"><label for="membership_number">Membership number</label><input id="membership_number" name="membership_number" placeholder="e.g. GM 0012/25" autocomplete="off"><p class="hint">As on your membership card: LT, GM, OM or PM, the number and the year.</p></div>
+                <div class="field member-check-btn"><button type="button" class="btn btn-teal" id="check-btn">Check my membership</button></div>
               </div>
               <div class="member-result" id="member-result" role="status" hidden></div>
             </div>

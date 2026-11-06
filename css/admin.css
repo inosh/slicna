@@ -48,7 +48,7 @@
 .nav-badge[hidden] { display: none; }
 @media (max-width: 860px) { .admin-nav-group { display: none; } }
 
-.admin-dialog-wide { width: min(980px, calc(100vw - 24px)); }
+.admin-dialog.admin-dialog-wide { width: min(980px, calc(100vw - 24px)); }
 .admin-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
 .admin-filters input, .admin-filters select { padding: 9px 12px; border-radius: 10px; border: 1.5px solid var(--line); font: inherit; font-size: 14px; background: #fff; }
 .admin-filters input { min-width: 220px; }
@@ -107,6 +107,12 @@
 .fee-panel .hint { margin: 0; }
 .fee-preview { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--mint-2); color: var(--teal-deep); font-size: 13.5px; font-weight: 600; }
 .export-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.admin-dialog.admin-dialog-xwide { width: min(1240px, calc(100vw - 24px)); }
+.reg-event-summary { margin: -6px 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--ink-2); }
+.reg-event-summary p { margin: 0 0 4px; line-height: 1.7; }
+.reg-event-summary .status-chip { margin-left: 8px; padding: 2px 10px; font-size: 12px; }
+.reg-event-summary b { color: var(--ink); }
 .export-actions[hidden] { display: none; }
 .form-grid .field[hidden] { display: none; }
 .history-list { list-style: none; padding: 0; margin: 0; font-size: 13.5px; }
@@ -126,6 +132,9 @@
 .admin-intro { color: var(--ink-2); margin-bottom: 24px; max-width: 70ch; }
 .admin-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-bottom: 22px; }
 .admin-card-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+/* The title and description share the row with the buttons, wrapping instead of pushing them below. */
+.admin-card-head > div:first-child { flex: 1 1 320px; min-width: 0; }
+.admin-card-head > :not(:first-child) { flex: none; }
 .admin-card-head h2 { font-size: 22px; margin: 0; }
 .admin-card-head p { margin: 4px 0 0; color: var(--ink-3); font-size: 14px; }
 .admin-summary { display: flex; flex-wrap: wrap; gap: 10px 24px; padding: 12px 16px; background: var(--mint-2); border-radius: 12px; margin-bottom: 14px; font-size: 14.5px; }

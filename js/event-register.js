@@ -95,9 +95,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.member = null;
     $('member-result').hidden = true;
     $('member-check').hidden = type !== 'member';
-    const nic = $('nic_number');
-    nic.readOnly = false;
-    $('nic-field').classList.remove('is-locked');
     if (type === 'non_member') {
       showDetails(true);
       setFee(event.fee_by_category.NM);
@@ -118,30 +115,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.hidden = false;
   }
 
+  // The number's prefix (LT/GM/OM/PM) sets the fee. Numbers in our register are
+  // also checked for lapsed or deactivated memberships; others are accepted and
+  // checked by SLICNA.
   $('check-btn').addEventListener('click', async () => {
     const number = $('membership_number').value.trim();
-    const nic = $('member_nic').value.trim().replace(/\s/g, '');
-    if (!number || !nic) return memberResult('Please enter your membership number and NIC.', false);
-    if (!/^(\d{9}[VvXx]|\d{12})$/.test(nic)) return memberResult('Enter your NIC as 12 digits, or 9 digits followed by V or X.', false);
+    if (!/^(LT|GM|OM|PM)\s*\d{1,4}\s*\/\s*\d{2}$/i.test(number)) {
+      return memberResult('Enter your membership number like GM 0012/25: LT, GM, OM or PM, the number and the year.', false);
+    }
     const btn = $('check-btn');
     btn.disabled = true;
     btn.textContent = 'Checking…';
     try {
-      const q = await SLICNA_API.eventMemberCheck(event.id, number, nic);
+      const q = await SLICNA_API.eventMemberCheck(event.id, number);
       if (!q.eligible) {
         state.member = null;
         showDetails(false);
-        memberResult(`<b>${esc(q.name_with_initials)}</b> · ${esc(q.category_label)}<br>${esc(q.message)}
+        memberResult(`<b>${esc(q.membership_number)}</b> · ${esc(q.category_label)}<br>${esc(q.message)}
           ${!membersOnly ? '<p style="margin:10px 0 0"><button type="button" class="btn btn-light btn-sm" data-as-non-member>Register as a non-member</button> <a class="link-arrow" href="/pages/membership-renew.html">Renew my membership</a></p>' : '<p style="margin:10px 0 0"><a class="link-arrow" href="/pages/membership-renew.html">Renew my membership</a></p>'}`, false);
         return;
       }
-      state.member = { ...q, nic };
+      state.member = q;
       memberResult(`<span class="check-mark" aria-hidden="true">✓</span>
-        <span><b>${esc(q.name_with_initials)}</b> · ${esc(q.membership_number)}<br>${esc(q.category_label)} · your fee: <b>${esc(money(q.fee))}</b></span>`, true);
-      const nicInput = $('nic_number');
-      nicInput.value = nic.toUpperCase();
-      nicInput.readOnly = true;
-      $('nic-field').classList.add('is-locked');
+        <span><b>${esc(q.membership_number)}</b> · ${esc(q.category_label)} · your fee: <b>${esc(money(q.fee))}</b>${q.found ? '' : `<br><span class="member-note">${esc(q.message)}</span>`}</span>`, true);
       showDetails(true);
       setFee(q.fee);
       $('full_name').focus();
@@ -157,22 +153,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('member-result').addEventListener('click', (e) => {
     if (!e.target.closest('[data-as-non-member]')) return;
-    const nic = $('member_nic').value.trim();
     form.querySelector('[name="registrant_type"][value="non_member"]').checked = true;
     chooseType('non_member');
-    if (nic) $('nic_number').value = nic.toUpperCase();
   });
 
-  // Changing the number or NIC after a successful check needs a new check.
-  ['membership_number', 'member_nic'].forEach((name) => $(name).addEventListener('input', () => {
+  // Changing the number after it was accepted needs a new check.
+  $('membership_number').addEventListener('input', () => {
     if (!state.member) return;
     state.member = null;
     $('member-result').hidden = true;
-    $('nic_number').readOnly = false;
-    $('nic-field').classList.remove('is-locked');
     showDetails(false);
-  }));
-  $('member_nic').addEventListener('keydown', (e) => {
+  });
+  $('membership_number').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       $('check-btn').click();
@@ -259,7 +251,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     data.set('registrant_type', state.type);
     if (state.type === 'member') {
       data.set('membership_number', state.member.membership_number);
-      data.set('nic_number', state.member.nic);
     } else {
       data.delete('membership_number');
     }

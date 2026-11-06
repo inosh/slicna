@@ -16,6 +16,7 @@
   const money = (n) => 'LKR ' + Number(n).toLocaleString('en-LK', { maximumFractionDigits: 2 });
   const chip = (cls, label) => `<span class="status-chip status-${esc(cls)}">${esc(label)}</span>`;
   const dl = (rows) => `<dl class="detail-list">${rows.filter(([, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => `<dt>${esc(k)}</dt><dd>${typeof v === 'object' ? v.html : esc(v)}</dd>`).join('')}</dl>`;
+  const html = (s) => ({ html: s });
   const dateRange = (e) => fmtDate(e.event_date) + (e.end_date ? ' – ' + fmtDate(e.end_date) : '');
 
   // Event status -> chip colour.
@@ -32,13 +33,6 @@
 
   let options = null;
   const loadOptions = async () => (options = options || await api('GET', `${BASE}/options`));
-
-  // Set by "Registrations" on an event row, read when the Registrations section opens.
-  let preselectEventId = '';
-  function openRegistrations(eventId) {
-    preselectEventId = String(eventId);
-    document.querySelector('#admin-nav button[data-key="registrations"]').click();
-  }
 
   // =====================================================================
   // Events
@@ -239,12 +233,11 @@
         { label: 'Date', html: (r) => esc(dateRange(r)) },
         { label: 'Event', main: true, html: (r) => `${esc(r.title)}<div class="admin-muted">${esc(r.event_type)}${r.location ? ' · ' + esc(r.location) : ''}${r.cpd_points != null ? ` · ${Number(r.cpd_points)} CPD pts` : ''}</div>` },
         { label: 'Status', html: (r) => eventChip(r) },
-        { label: 'Fee', html: (r) => (r.category === 'cpd' ? `<span class="admin-muted" title="${esc(feeTitle(r))}">${esc(feeText(r))}</span>` : '—') },
+        { label: 'Fee', html: (r) => (r.category === 'cpd' ? `<span class="admin-muted" style="white-space:nowrap" title="${esc(feeTitle(r))}">${esc(feeText(r))}</span>` : '—') },
         { label: 'Registrations', html: (r) => (r.category !== 'cpd' ? '—' : r.registrations_total
           ? `<b>${r.registrations_confirmed}</b> confirmed${r.registrations_pending ? `<div class="admin-muted"><b>${r.registrations_pending}</b> to review</div>` : ''}`
           : '<span class="admin-muted">None</span>') },
       ],
-      rowActions: [{ label: 'Registrations', onClick: (r) => (r.category === 'cpd' ? openRegistrations(r.id) : toast('Only CPD events take registrations.', true)) }],
       image: { column: 'photo_url', field: 'photo', label: 'Poster or photo' },
       defaults: () => ({ category: kind === 'other' ? 'other' : 'cpd', audience: 'public', fee_type: 'free', member_pricing: 'same' }),
       get fields() { return fields(); },
@@ -265,60 +258,125 @@
   // Registrations
   // =====================================================================
 
+  // CPD events with their registration counts; "Registrations" opens the event's registrations.
   async function renderRegistrations(main) {
     const card = document.createElement('section');
     card.className = 'admin-card';
     main.appendChild(card);
     card.innerHTML = `
-      <div class="admin-card-head"><div><h2>Event registrations</h2><p>Check each registration and payment slip, then confirm or reject it. The registrant is emailed either way.</p></div>
-        <div class="export-actions" data-exports hidden>
-          <button type="button" class="btn btn-light btn-sm" data-export="xlsx">Download Excel</button>
-          <button type="button" class="btn btn-light btn-sm" data-export="pdf">Attendance sheet (PDF)</button>
-        </div></div>
-      <div data-filters></div><div data-list></div>`;
+      <div class="admin-card-head"><div><h2>CPD event registrations</h2><p>Open an event's registrations to check each payment slip, then confirm or reject it. The registrant is emailed either way.</p></div>
+        <button type="button" class="btn btn-light btn-sm" data-refresh>Refresh</button></div>
+      <div class="admin-filters" data-when></div>
+      <div data-list></div>`;
     const listEl = card.querySelector('[data-list]');
-    const exportsEl = card.querySelector('[data-exports]');
-
+    const whenEl = card.querySelector('[data-when]');
     let events = [];
-    try { events = (await api('GET', `${BASE}/events`)).filter((e) => e.category === 'cpd'); } catch (err) { /* list still works */ }
-    const eventOptions = events.map((e) => [String(e.id), `${fmtDate(e.event_date)} · ${e.title}${e.registrations_pending ? ` (${e.registrations_pending} to review)` : ''}`]);
+    let when = 'upcoming';
 
-    const filters = filterBar(card.querySelector('[data-filters]'), {
-      chipKey: 'status',
-      chips: [['pending', 'Pending'], ['confirmed', 'Confirmed'], ['rejected', 'Rejected'], ['all', 'All']],
-      selects: [{ key: 'event_id', label: 'Event', options: eventOptions }],
-      onChange: load,
-    });
-    if (preselectEventId) {
-      card.querySelector('[data-select="event_id"]').value = preselectEventId;
-      filters.event_id = preselectEventId;
-      preselectEventId = '';
+    function render() {
+      const groups = { upcoming: events.filter((e) => !e.is_past), past: events.filter((e) => e.is_past), all: events };
+      whenEl.innerHTML = [['upcoming', 'Upcoming'], ['past', 'Past'], ['all', 'All']]
+        .map(([k, label]) => `<button type="button" class="chip" data-when-chip="${k}" aria-pressed="${k === when}">${label} (${groups[k].length})</button>`).join('');
+      // Upcoming: soonest first. Past and All: newest first.
+      const rows = when === 'upcoming' ? [...groups.upcoming].reverse() : groups[when];
+      listEl.innerHTML = rows.length ? `
+        <div class="admin-table-wrap"><table class="admin-table">
+          <thead><tr><th>Date</th><th>Event</th><th>Status</th><th>Fee</th><th>Registrations</th><th></th></tr></thead>
+          <tbody>${rows.map((e) => `
+            <tr data-id="${e.id}">
+              <td style="white-space:nowrap">${esc(dateRange(e))}</td>
+              <td class="main-col">${esc(e.title)}<div class="admin-muted">${esc(e.event_type)}${e.location ? ' · ' + esc(e.location) : ''}</div></td>
+              <td>${eventChip(e)}</td>
+              <td style="white-space:nowrap"><span class="admin-muted" title="${esc(feeTitle(e))}">${esc(feeText(e))}</span></td>
+              <td>${regCounts(e)}</td>
+              <td><div class="row-actions"><button type="button" class="btn ${e.registrations_pending ? 'btn-teal' : 'btn-light'} btn-sm" data-open>Registrations${e.registrations_pending ? ` (${e.registrations_pending})` : ''}</button></div></td>
+            </tr>`).join('')}</tbody>
+        </table></div>` : '<p class="admin-empty">No CPD events here.</p>';
     }
+
+    async function load() {
+      listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
+      try {
+        events = (await api('GET', `${BASE}/events`)).filter((e) => e.category === 'cpd');
+        render();
+      } catch (err) {
+        listEl.innerHTML = `<p class="admin-empty">${esc(err.message)}</p>`;
+      }
+    }
+
+    whenEl.addEventListener('click', (e) => {
+      const c = e.target.closest('[data-when-chip]');
+      if (!c) return;
+      when = c.dataset.whenChip;
+      render();
+    });
+    card.querySelector('[data-refresh]').onclick = load;
+    listEl.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr[data-id]');
+      if (tr && e.target.closest('[data-open]')) {
+        registrationsWindow(events.find((x) => String(x.id) === tr.dataset.id), () => { load(); A.refreshBadges(); });
+      }
+    });
+    load();
+  }
+
+  const regCounts = (e) => (e.registrations_total
+    ? `<b>${e.registrations_total}</b> total<div class="admin-muted">${e.registrations_confirmed} confirmed${e.registrations_pending ? ` · <b>${e.registrations_pending}</b> to review` : ''}${e.registrations_rejected ? ` · ${e.registrations_rejected} rejected` : ''}</div>`
+    : '<span class="admin-muted">None yet</span>');
+
+  // One event's registrations: event details, status tabs with counts, search,
+  // downloads, and the list. A row opens the registration to confirm or reject.
+  function registrationsWindow(event, onChanged) {
+    const view = infoDialog({ title: `Registrations · ${event.title}` });
+    view.dialog.classList.add('admin-dialog-xwide');
+    // Essentials only, in two short lines under the title (as in SLNA).
+    const facts = [dateRange(event), event.location, event.cpd_points != null ? `${Number(event.cpd_points)} CPD points` : null, event.audience === 'members' ? 'Members only' : null]
+      .filter(Boolean).map(esc).join(' · ');
+    const fees = event.fees.length
+      ? event.fees.map((f) => `${esc(f.label.replace(/ members$/, ''))}: <b>${f.amount ? esc(money(f.amount)) : 'Free'}</b>`).join(' · ')
+      : '<b>Free</b>';
+    view.body.innerHTML = `
+      <div class="reg-event-summary">
+        <p>${facts} ${eventChip(event)}</p>
+        <p>Event fee: ${fees}</p>
+      </div>
+      <div data-filters></div>
+      <div data-list></div>`;
+    const listEl = view.body.querySelector('[data-list]');
+    const filters = filterBar(view.body.querySelector('[data-filters]'), {
+      chipKey: 'status',
+      chips: [['all', 'All'], ['pending', 'Pending'], ['confirmed', 'Confirmed'], ['rejected', 'Rejected']],
+      onChange: load,
+      actions: `<span class="filter-actions">
+        <button type="button" class="btn btn-light btn-sm" data-act="refresh">Refresh</button>
+        <button type="button" class="btn btn-light btn-sm" data-act="xlsx">Download Excel</button>
+        <button type="button" class="btn btn-light btn-sm" data-act="pdf">Download PDF</button></span>`,
+    });
+    view.body.querySelector('[data-search]').placeholder = 'Search name, NIC, email, membership number…';
 
     async function updateCounts() {
       try {
-        const counts = await api('GET', `${BASE}/registrations/counts${query({ event_id: filters.event_id, q: filters.q })}`);
-        card.querySelectorAll('[data-chip]').forEach((c) => { c.textContent = `${c.dataset.label} (${counts[c.dataset.chip] || 0})`; });
+        const counts = await api('GET', `${BASE}/registrations/counts${query({ event_id: event.id, q: filters.q })}`);
+        view.body.querySelectorAll('[data-chip]').forEach((c) => { c.textContent = `${c.dataset.label} (${counts[c.dataset.chip] || 0})`; });
       } catch (err) { /* keep the plain labels */ }
     }
 
     async function load() {
-      exportsEl.hidden = !filters.event_id;
       listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
       try {
-        const rows = await api('GET', `${BASE}/registrations${query({ status: filters.status, event_id: filters.event_id, q: filters.q })}`);
+        const rows = await api('GET', `${BASE}/registrations${query({ status: filters.status, event_id: event.id, q: filters.q })}`);
         updateCounts();
-        const showEvent = !filters.event_id;
         listEl.innerHTML = rows.length ? `
           <div class="admin-table-wrap"><table class="admin-table">
-            <thead><tr><th>Received</th><th>Registrant</th>${showEvent ? '<th>Event</th>' : ''}<th>Registered as</th><th>Fee</th><th>Status</th></tr></thead>
+            <thead><tr><th>Registrant</th><th>NIC / Email</th><th>Registered as</th><th>Fee</th><th>Paid by</th><th>Slip</th><th>Status</th></tr></thead>
             <tbody>${rows.map((r) => `
               <tr class="is-clickable" data-id="${r.id}" tabindex="0">
-                <td>${esc(fmtDate(r.created_at))}<div class="admin-muted">${esc(r.reference_number)}</div></td>
-                <td class="main-col">${esc(r.full_name)}<div class="admin-muted">${esc(r.nic_number)} · ${esc(r.workplace)}</div></td>
-                ${showEvent ? `<td>${esc(r.event_title)}<div class="admin-muted">${esc(fmtDate(r.event_date))}</div></td>` : ''}
-                <td>${r.membership_number ? `${esc(r.membership_number)}<div class="admin-muted">${esc(REGISTERED_AS[r.fee_category])}</div>` : 'Non-member'}</td>
+                <td class="main-col">${esc(r.full_name)}<div class="admin-muted">${esc(r.reference_number)} · ${esc(fmtDate(r.created_at))}</div></td>
+                <td>${esc(r.nic_number)}<div class="admin-muted">${esc(r.email)}</div></td>
+                <td>${r.membership_number ? `${esc(r.membership_number)}<div class="admin-muted">${esc(REGISTERED_AS[r.fee_category])}${r.member_id ? '' : ' · not in register'}</div>` : 'Non-member'}</td>
                 <td>${Number(r.amount_due) ? esc(money(r.amount_due)) : 'Free'}</td>
+                <td>${r.pay_by ? (r.pay_by === 'organisation' ? 'Organisation' : 'Individual') : '—'}</td>
+                <td>${r.has_receipt ? 'Yes' : '—'}</td>
                 <td>${chip(REG_CHIP[r.status], REG_STATUS[r.status])}</td>
               </tr>`).join('')}</tbody>
           </table></div>` : '<p class="admin-empty">No registrations here.</p>';
@@ -327,17 +385,20 @@
       }
     }
 
-    exportsEl.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-export]');
-      if (b) A.downloadPrivateFile(`${BASE}/events/${filters.event_id}/registrations.${b.dataset.export}`);
+    const changed = () => { load(); onChanged(); };
+    view.body.querySelector('[data-filters]').addEventListener('click', (e) => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (act === 'refresh') load();
+      // Both downloads hold the registrations of the selected tab.
+      else if (act === 'xlsx' || act === 'pdf') A.downloadPrivateFile(`${BASE}/events/${event.id}/registrations.${act}${query({ status: filters.status })}`);
     });
     listEl.addEventListener('click', (e) => {
       const tr = e.target.closest('tr[data-id]');
-      if (tr) reviewRegistration(Number(tr.dataset.id), load);
+      if (tr) reviewRegistration(Number(tr.dataset.id), changed);
     });
     listEl.addEventListener('keydown', (e) => {
       const tr = e.target.closest('tr[data-id]');
-      if (tr && e.key === 'Enter') reviewRegistration(Number(tr.dataset.id), load);
+      if (tr && e.key === 'Enter') reviewRegistration(Number(tr.dataset.id), changed);
     });
     load();
   }
@@ -367,7 +428,9 @@
           ])}</div>
           <div class="detail-section"><h3>Registered as</h3>${dl([
             ['Type', REGISTERED_AS[r.fee_category]],
-            ['Membership number', r.membership_number ? `${r.membership_number} (checked against the member register)` : ''],
+            ['Membership number', r.membership_number ? (r.member_id
+              ? `${r.membership_number} (found in the member register)`
+              : html(`${esc(r.membership_number)} <span class="status-chip status-pending">Not in the member register</span><div class="admin-muted">The fee was set from the number's prefix. Check the membership before confirming.</div>`)) : ''],
           ])}</div>
           <div class="detail-section"><h3>Payment</h3>${dl([
             ['Fee', paid ? money(r.amount_due) : 'Free'],
@@ -386,7 +449,7 @@
           </div>
           ${paid ? '<div class="detail-section"><h3>Payment slip</h3><div data-docs></div></div>' : ''}
           <div class="action-bar">
-            ${r.status !== 'confirmed' && r.status !== 'rejected' ? '<button type="button" class="btn btn-teal btn-sm" data-act="confirm">Confirm…</button>' : ''}
+            ${r.status !== 'confirmed' && r.status !== 'rejected' ? '<button type="button" class="btn btn-teal btn-sm" data-act="confirm">Confirm</button>' : ''}
             ${r.status !== 'rejected' ? '<button type="button" class="btn btn-light btn-sm" data-act="reject">Reject…</button>' : ''}
             ${r.status !== 'pending' ? '<button type="button" class="btn btn-light btn-sm" data-act="pending">Move back to Pending</button>' : ''}
             <button type="button" class="btn btn-danger btn-sm" data-act="delete">Delete</button>
@@ -412,20 +475,17 @@
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (!act) return;
       if (act === 'confirm') {
-        const ok = await openForm({
-          title: 'Confirm registration',
-          fields: [
-            { name: 'status_note', label: 'Message to the registrant', type: 'textarea', rows: 3, hint: 'Optional, included in the confirmation email (for example the reporting time).' },
-            { name: 'admin_notes', label: 'Internal notes', type: 'textarea', rows: 2, hint: 'Only visible to admins.' },
-          ],
-          values: { admin_notes: r.admin_notes },
-          hidden: { status: 'confirmed' },
-          saveLabel: 'Confirm registration',
-          confirmTitle: 'Confirm this registration?',
-          confirmMessage: `${who} will be emailed that their place for "${r.event_title}" is confirmed.${paid ? `\n\nOnly confirm after checking the payment slip (${money(r.amount_due)}).` : ''}`,
-          submit: patch,
-        });
-        if (ok) done('Registration confirmed.');
+        if (!(await confirmDialog({
+          title: 'Confirm registration?',
+          message: `${who} will be emailed that their place for "${r.event_title}" is confirmed.${paid ? `\n\nOnly confirm after checking the payment slip (${money(r.amount_due)}).` : ''}`,
+          confirmText: 'Confirm',
+        }))) return;
+        try {
+          const fd = new FormData();
+          fd.append('status', 'confirmed');
+          await patch(fd);
+          done('Registration confirmed.');
+        } catch (err) { toast(err.message, true); }
       } else if (act === 'reject') {
         const ok = await openForm({
           title: 'Reject registration',
@@ -462,6 +522,6 @@
   A.registerSection('events', { group: 'events', label: 'Events', sub: 'CPD and other events', render: renderEvents });
   A.registerSection('registrations', {
     group: 'events', label: 'Registrations', sub: 'CPD sign-ups to review', render: renderRegistrations,
-    intro: 'Registrations for CPD events. Confirming or rejecting emails the registrant.',
+    intro: 'Registrations for each CPD event. Confirming or rejecting emails the registrant.',
   });
 })();
