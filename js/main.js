@@ -1,8 +1,7 @@
 // Shared behaviour for every page: navigation, scroll reveal, and small render helpers.
 const SLICNA = (() => {
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const CATEGORY_LABELS = { cpd: 'CPD programme', community: 'Community', international: 'International' };
-  const CATEGORY_TAGS = { cpd: 'tag-teal', community: 'tag', international: 'tag-gold' };
+  const CATEGORY_LABELS = { cpd: 'CPD event', other: 'Event' };
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -31,19 +30,44 @@ const SLICNA = (() => {
     return Number(points).toFixed(points % 1 ? 1 : 0);
   }
 
+  const formatMoney = (n) => 'LKR ' + Number(n).toLocaleString('en-LK', { maximumFractionDigits: 2 });
+
+  // Type tag colour: CPD teal, international workshops gold, other events coral.
+  function typeTag(event) {
+    const cls = event.event_type === 'International Workshop' ? 'tag-gold' : event.category === 'cpd' ? 'tag-teal' : 'tag';
+    return `<span class="${cls}">${escapeHtml(event.event_type || CATEGORY_LABELS[event.category] || 'Event')}</span>`;
+  }
+
+  // Status badge for upcoming events ("Registration Open" stands out).
+  function statusBadge(event) {
+    if (event.is_past || !event.status_label) return '';
+    return `<span class="event-status event-status-${escapeHtml(event.status)}">${escapeHtml(event.status_label)}</span>`;
+  }
+
+  // "Free", "LKR 1,500" or a range ("Free – LKR 1,500") for the lists.
+  function feeShort(event) {
+    if (event.category !== 'cpd') return '';
+    const amounts = (event.fees || []).map((f) => Number(f.amount));
+    if (!amounts.length || amounts.every((a) => a === 0)) return 'Free';
+    const min = Math.min(...amounts);
+    const max = Math.max(...amounts);
+    if (min === max) return formatMoney(min);
+    return `${min ? formatMoney(min) : 'Free'} – ${formatMoney(max)}`;
+  }
+
   function eventRow(event) {
     const d = parseDate(event.event_date);
     const day = d ? d.getDate() : '—';
     const mon = d ? `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` : '';
-    const cat = event.category || 'cpd';
     const points = event.cpd_points ? `<span>${formatPoints(event.cpd_points)} CPD points</span>` : '';
+    const fee = !event.is_past && feeShort(event) ? `<span>${escapeHtml(feeShort(event))}</span>` : '';
     return `
       <a class="event-row" href="/pages/event-detail.html?id=${encodeURIComponent(event.id)}">
         <div class="date-tile"><b>${day}</b><span>${mon}</span></div>
         <div>
-          <span class="${CATEGORY_TAGS[cat] || 'tag'}">${escapeHtml(CATEGORY_LABELS[cat] || cat)}</span>
+          <div class="event-tags">${typeTag(event)}${statusBadge(event)}</div>
           <h3>${escapeHtml(event.title)}</h3>
-          <div class="event-meta">${event.location ? `<span>${escapeHtml(event.location)}</span>` : ''}${points}</div>
+          <div class="event-meta">${event.location ? `<span>${escapeHtml(event.location)}</span>` : ''}${points}${fee}</div>
         </div>
         <span class="event-go" aria-hidden="true">&rarr;</span>
       </a>`;
@@ -146,5 +170,5 @@ const SLICNA = (() => {
     document.querySelectorAll('[data-year]').forEach((el) => { el.textContent = new Date().getFullYear(); });
   });
 
-  return { escapeHtml, formatDate, parseDate, isUpcoming, formatPoints, eventRow, newsCard, paragraphs, media, CATEGORY_LABELS };
+  return { escapeHtml, formatDate, parseDate, isUpcoming, formatPoints, formatMoney, typeTag, statusBadge, feeShort, eventRow, newsCard, paragraphs, media, CATEGORY_LABELS };
 })();

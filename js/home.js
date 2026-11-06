@@ -15,12 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
         : '<p class="empty">New programmes will be announced soon. Follow us on Facebook for updates.</p>';
 
       const yearOf = (e) => SLICNA.parseDate(e.event_date)?.getFullYear();
-      const withPoints = events.filter((e) => e.cpd_points != null);
+      const withPoints = events.filter((e) => e.category === 'cpd' && e.cpd_points != null);
       const thisYear = new Date().getFullYear();
       const year = withPoints.some((e) => yearOf(e) === thisYear) ? thisYear : Math.max(...withPoints.map(yearOf), thisYear);
       const cpdYear = withPoints.filter((e) => yearOf(e) === year);
       const total = cpdYear.reduce((sum, e) => sum + Number(e.cpd_points), 0);
-      const intl = events.filter((e) => e.category === 'international' && yearOf(e) === year).length;
+      const intl = events.filter((e) => e.event_type === 'International Workshop' && yearOf(e) === year).length;
 
       document.querySelectorAll('[data-cpd-year]').forEach((el) => { el.textContent = year; });
       document.getElementById('hero-cpd-total').textContent = SLICNA.formatPoints(total);
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
       others.filter((s) => s.style !== 'cards').forEach((s) => small.push(tile(firstPhoto(s), '', s.eyebrow || s.title, s.body)));
       sections.filter((s) => s.style === 'cards').forEach((s) => s.items.forEach((i) => small.push(tile(i.image_url, '', i.title, i.text))));
 
-      const next = events.find((e) => e.category === 'community' && SLICNA.isUpcoming(e));
+      const next = events.find((e) => e.category === 'other' && SLICNA.isUpcoming(e));
       const quote = next ? `
         <a class="bento-item bento-quote" href="/pages/event-detail.html?id=${encodeURIComponent(next.id)}" style="text-decoration:none">
           <p>${esc(next.title)}</p>

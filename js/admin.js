@@ -4,16 +4,18 @@
 // Every save and delete asks for confirmation, and closing a form with
 // unsaved changes asks before discarding them.
 (() => {
+  const FE = SLICNA_FORM_ERRORS;
   const TOKEN_KEY = 'slicna_admin_token';
   const USER_KEY = 'slicna_admin_user';
   const token = sessionStorage.getItem(TOKEN_KEY);
   if (!token) {
+    // Remember the section (e.g. #applications from an email link) to open after logging in.
+    if (/^#[\w-]+$/.test(window.location.hash)) sessionStorage.setItem('slicna_admin_next', window.location.hash);
     window.location.replace('/pages/admin-login.html');
     return;
   }
 
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const CATEGORY_LABELS = { cpd: 'CPD programme', international: 'International', community: 'Community' };
 
   // ---------- Helpers ----------
 
@@ -153,15 +155,19 @@
   }
 
   // Opens the add/edit form. Resolves when the item was saved (true) or the form was closed (false).
-  function openForm({ title, fields, image, values = {}, hidden = {}, saveLabel, confirmTitle, confirmMessage, submit }) {
+  // Optional: extra (HTML, or a function of values) adds custom fields after the
+  // standard ones; onMount(form) wires them up; validate(form) returns an error
+  // message or nothing. Fields inside a [hidden] block are not checked or required.
+  function openForm({ title, fields, image, values = {}, hidden = {}, saveLabel, confirmTitle, confirmMessage, submit, extra, onMount, validate, wide }) {
     return new Promise((resolve) => {
-      const dialog = makeDialog();
+      const dialog = makeDialog(wide ? 'admin-dialog-wide' : '');
       dialog.innerHTML = `
         <form novalidate>
           <div class="dialog-head"><h2>${esc(title)}</h2><button type="button" class="dialog-close" data-close aria-label="Close">&times;</button></div>
           <div class="dialog-body">
             <div class="form-grid">
               ${fields.map((f) => fieldHtml(f, values[f.name])).join('')}
+              ${extra ? (typeof extra === 'function' ? extra(values) : extra) : ''}
               ${image ? imageFieldHtml(image, values[image.column]) : ''}
             </div>
             <div class="form-error" hidden></div>
@@ -173,7 +179,12 @@
         </form>`;
       const form = dialog.querySelector('form');
       const errorEl = dialog.querySelector('.form-error');
-      const initial = formState(form);
+      // Under the field the message is about, else in the box at the bottom; focus follows.
+      const showError = (message) => FE.showError(form, errorEl, message, {
+        boxShow: (box, m) => { box.textContent = m; box.hidden = false; },
+        boxHide: (box) => { box.hidden = true; },
+      });
+      let initial = formState(form);
       let saved = false;
 
       // Multi-photo pickers show a thumbnail of each chosen photo.
@@ -217,19 +228,26 @@
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         errorEl.hidden = true;
-        const missing = [...form.querySelectorAll('[required]')].find((el) => (el.type === 'file' ? !el.files.length : !el.value.trim()));
+        FE.clearAll(form);
+        const missing = [...form.querySelectorAll('[required]')]
+          .filter((el) => !el.disabled && !el.closest('[hidden]'))
+          .find((el) => (el.type === 'file' ? !el.files.length : el.type === 'radio' ? !form.querySelector(`[name="${el.name}"]:checked`) : !el.value.trim()));
         if (missing) {
-          const label = form.querySelector(`label[for="${missing.id}"]`).childNodes[0].textContent.trim();
-          errorEl.textContent = missing.type === 'file' ? `Please choose at least one photo for "${label}".` : `Please fill in "${label}".`;
-          errorEl.hidden = false;
-          missing.focus();
+          FE.setFieldError(missing, missing.type === 'file' ? 'Please choose a file.' : missing.type === 'radio' ? 'Please choose one.' : 'This is required.');
+          FE.focusOn(missing);
+          return;
+        }
+        const problem = validate ? validate(form) : null;
+        if (problem) {
+          showError(problem);
           return;
         }
         const message = typeof confirmMessage === 'function' ? confirmMessage(new FormData(form)) : confirmMessage;
         if (!(await confirmDialog({ title: confirmTitle, message, confirmText: saveLabel }))) return;
 
         const data = new FormData(form);
-        if (fileInput && !fileInput.files.length) data.delete(fileInput.name);
+        // Empty file inputs would upload a blank file; leave them out.
+        form.querySelectorAll('input[type="file"]').forEach((el) => { if (!el.files.length) data.delete(el.name); });
         Object.entries(hidden).forEach(([k, v]) => data.set(k, v));
 
         const button = form.querySelector('[type="submit"]');
@@ -239,13 +257,16 @@
           saved = true;
           finish();
         } catch (err) {
-          errorEl.textContent = err.message;
-          errorEl.hidden = false;
+          showError(err.message);
         } finally {
           button.disabled = false;
         }
       });
 
+      if (onMount) {
+        onMount(form, values);
+        initial = formState(form);
+      }
       dialog.showModal();
       const first = form.querySelector('input:not([type="hidden"]), textarea, select');
       if (first) first.focus();
@@ -255,7 +276,8 @@
   // ---------- Reusable list panel ----------
   // config: { title, intro, endpoint, singular, nameOf(row), columns: [{ label, html(row), main }],
   //           fields, addOnlyFields (shown only when adding), image, load(), defaults(rows), hidden,
-  //           summary(rows), rowActions: [{ label, onClick(row) }], emptyText, addLabel }
+  //           summary(rows), rowActions: [{ label, onClick(row) }], emptyText, addLabel,
+  //           form: { extra, onMount, validate, wide } (see openForm), confirmAdd }
 
   function resourcePanel(container, config) {
     const card = document.createElement('section');
@@ -314,9 +336,10 @@
           image: config.image,
           values: config.defaults ? config.defaults(rows) : {},
           hidden: config.hidden || {},
+          ...(config.form || {}),
           saveLabel: 'Add ' + config.singular,
           confirmTitle: 'Add this ' + config.singular + '?',
-          confirmMessage: 'It will appear on the public website straight away.',
+          confirmMessage: config.confirmAdd || 'It will appear on the public website straight away.',
           submit: (data) => api('POST', config.endpoint, data),
         });
         if (ok) { toast(capital(config.singular) + ' added.'); reload(); }
@@ -327,6 +350,7 @@
           image: config.image,
           values: row,
           hidden: config.hidden || {},
+          ...(config.form || {}),
           saveLabel: 'Save changes',
           confirmTitle: 'Save changes?',
           confirmMessage: `Your changes to "${nameOf(row)}" will appear on the public website straight away.`,
@@ -383,43 +407,6 @@
             { name: 'published_at', label: 'Published date', type: 'date', required: true, half: true },
             { name: 'summary', label: 'Summary', type: 'textarea', rows: 3, max: 1000, hint: 'One or two sentences shown on news cards.' },
             { name: 'body', label: 'Full article', type: 'textarea', rows: 10, max: 50000, hint: 'Leave a blank line between paragraphs.' },
-          ],
-        });
-      },
-    },
-
-    events: {
-      label: 'Events & CPD', sub: 'All events and CPD points',
-      render(main) {
-        resourcePanel(main, {
-          title: 'Events', intro: 'Every event appears on the Events page. Events with CPD points also appear on the CPD page, where the totals are calculated automatically.',
-          endpoint: '/events', singular: 'event',
-          load: async () => (await api('GET', '/events')).sort((a, b) => b.event_date.localeCompare(a.event_date)),
-          summary(rows) {
-            const year = new Date().getFullYear();
-            const cpd = rows.filter((r) => r.cpd_points != null && r.event_date.startsWith(String(year)));
-            const total = cpd.reduce((s, r) => s + Number(r.cpd_points), 0);
-            const upcoming = rows.filter((r) => (r.end_date || r.event_date) >= today()).length;
-            return `<span>${year}: <b>${cpd.length}</b> CPD programmes, <b>${Number(total.toFixed(2))}</b> CPD points</span><span><b>${upcoming}</b> upcoming events</span>`;
-          },
-          columns: [
-            { label: 'Date', html: (r) => esc(fmtDate(r.event_date)) + (r.end_date ? ' – ' + esc(fmtDate(r.end_date)) : '') },
-            { label: 'Event', html: (r) => esc(r.title), main: true },
-            { label: 'Type', html: (r) => `<span class="${r.category === 'cpd' ? 'tag-teal' : r.category === 'international' ? 'tag-gold' : 'tag'}">${esc(CATEGORY_LABELS[r.category])}</span>` },
-            { label: 'CPD pts', html: (r) => (r.cpd_points != null ? esc(Number(r.cpd_points).toFixed(2)) : '—') },
-          ],
-          image: { column: 'photo_url', field: 'photo', label: 'Poster or photo' },
-          defaults: () => ({ category: 'cpd' }),
-          fields: [
-            { name: 'title', label: 'Title', required: true, max: 300 },
-            { name: 'category', label: 'Type', type: 'select', required: true, half: true, options: [['cpd', 'CPD programme'], ['international', 'International workshop'], ['community', 'Community event']] },
-            { name: 'cpd_points', label: 'CPD points', type: 'number', step: '0.25', min: 0, half: true, hint: 'Leave empty if the event has no CPD points.' },
-            { name: 'event_date', label: 'Date', type: 'date', required: true, half: true },
-            { name: 'end_date', label: 'End date', type: 'date', half: true, hint: 'Only for events over several days.' },
-            { name: 'time_text', label: 'Time', max: 100, half: true, hint: 'For example: 8.00 a.m. – 4.00 p.m.' },
-            { name: 'location', label: 'Venue', max: 300, half: true },
-            { name: 'summary', label: 'Summary', type: 'textarea', rows: 3, max: 1000 },
-            { name: 'body', label: 'Details', type: 'textarea', rows: 6, max: 20000, hint: 'Shown on the event page. Leave a blank line between paragraphs.' },
           ],
         });
       },
@@ -483,7 +470,7 @@
     },
 
     about: {
-      label: 'About page', sub: 'Milestones and photo',
+      label: 'About Page', sub: 'Milestones and photo',
       render(main) {
         const photoCard = document.createElement('section');
         photoCard.className = 'admin-card';
@@ -546,7 +533,7 @@
     },
 
     community: {
-      label: 'Community page', sub: 'Sections, photos and cards',
+      label: 'Community Page', sub: 'Sections, photos and cards',
       render(main) {
         const STYLE_LABELS = { feature: 'Photo grid', highlight: 'Dark band', cards: 'Cards' };
         const itemsHost = document.createElement('div');
@@ -739,14 +726,18 @@
 
   // Private membership files need the login token, so they're fetched as
   // blobs and shown through temporary object URLs instead of plain links.
-  async function apiBlob(path) {
+  async function fetchPrivate(path) {
     const res = await fetch(SLICNA_CONFIG.API_BASE_URL.replace(/\/+$/, '') + path, { headers: { Authorization: 'Bearer ' + token } });
     if (res.status === 401) logout('expired=1');
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || 'Could not load the file.');
     }
-    return res.blob();
+    return res;
+  }
+
+  async function apiBlob(path) {
+    return (await fetchPrivate(path)).blob();
   }
 
   async function openPrivateFile(path) {
@@ -762,20 +753,95 @@
     }
   }
 
+  // Saves the file. Without a filename, uses the one the server sends
+  // (Content-Disposition). Returns true once the download has started.
   async function downloadPrivateFile(path, filename) {
     try {
-      const url = URL.createObjectURL(await apiBlob(path));
+      const res = await fetchPrivate(path);
+      const match = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '');
+      const url = URL.createObjectURL(await res.blob());
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename;
+      a.download = filename || (match ? match[1] : 'download');
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10000);
+      return true;
     } catch (err) {
       toast(err.message, true);
+      return false;
     }
   }
+
+  // Document tile with a preview for images; click opens the file in a new tab.
+  async function docTiles(container, docs) {
+    const objectUrls = [];
+    container.innerHTML = docs.length ? `<div class="doc-tiles">${docs.map((d, i) => `
+      <div class="doc-tile">
+        <button type="button" class="doc-preview" data-doc="${i}" title="Open ${esc(d.label)}">Loading…</button>
+        <div class="doc-label">${esc(d.label)} <button type="button" class="copy-btn" data-doc="${i}">Open</button></div>
+      </div>`).join('')}</div>` : '<p class="admin-muted">No documents.</p>';
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-doc]');
+      if (btn) openPrivateFile(docs[Number(btn.dataset.doc)].path);
+    });
+    await Promise.all(docs.map(async (d, i) => {
+      const preview = container.querySelector(`.doc-preview[data-doc="${i}"]`);
+      try {
+        const blob = await apiBlob(d.path);
+        if (blob.type.startsWith('image/')) {
+          const url = URL.createObjectURL(blob);
+          objectUrls.push(url);
+          preview.innerHTML = `<img src="${url}" alt="">`;
+        } else {
+          preview.textContent = blob.type === 'application/pdf' ? 'PDF document' : 'File';
+        }
+      } catch (err) {
+        preview.textContent = 'Could not load';
+      }
+    }));
+    return () => objectUrls.forEach((u) => URL.revokeObjectURL(u));
+  }
+
+  // Status tabs (chips), dropdown filters and a search box above a list.
+  // Returns the live filter state; onChange(state) runs after every change.
+  function filterBar(host, { chips, chipKey, selects = [], search = true, onChange, actions = '' }) {
+    const state = { [chipKey]: chips[0][0] };
+    host.innerHTML = `
+      <div class="admin-filters">
+        ${chips.map(([v, label], i) => `<button type="button" class="chip" data-chip="${esc(v)}" data-label="${esc(label)}" aria-pressed="${i === 0}">${esc(label)}</button>`).join('')}
+        ${selects.map((s) => `<select data-select="${s.key}" aria-label="${esc(s.label)}"><option value="">${esc(s.label)}: all</option>${s.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>`).join('')}
+        ${search ? '<input type="search" data-search placeholder="Search name, NIC, number…" aria-label="Search">' : ''}
+        ${actions}
+      </div>`;
+    let timer = null;
+    host.addEventListener('click', (e) => {
+      const c = e.target.closest('[data-chip]');
+      if (!c) return;
+      host.querySelectorAll('[data-chip]').forEach((b) => b.setAttribute('aria-pressed', String(b === c)));
+      state[chipKey] = c.dataset.chip;
+      onChange(state);
+    });
+    host.addEventListener('change', (e) => {
+      const s = e.target.closest('[data-select]');
+      if (s) { state[s.dataset.select] = s.value; onChange(state); }
+    });
+    host.addEventListener('input', (e) => {
+      if (!e.target.matches('[data-search]')) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => { state.q = e.target.value.trim(); onChange(state); }, 300);
+    });
+    return state;
+  }
+
+  // "?status=pending&q=..." from the set values ("all" and empty are left out).
+  const query = (obj) => {
+    const p = new URLSearchParams();
+    Object.entries(obj).forEach(([k, v]) => { if (v && v !== 'all') p.set(k, v); });
+    const s = p.toString();
+    return s ? '?' + s : '';
+  };
 
   // A read-only dialog (details, previews). Returns { dialog, body, close }.
   function infoDialog({ title, wide = true, onClose }) {
@@ -795,14 +861,15 @@
 
   // ---------- Shell: navigation, user menu, password ----------
 
-  const GROUPS = { membership: 'Membership', content: 'Website content' };
+  const GROUPS = { membership: 'Membership', events: 'Events & CPD', content: 'Website content' };
   Object.values(SECTIONS).forEach((s) => { s.group = s.group || 'content'; });
 
-  // Lets js/admin-membership.js add its sections before the page starts.
+  // Lets js/admin-membership.js and js/admin-events.js add their sections before the page starts.
   window.SLICNA_ADMIN = {
     api, apiBlob, openPrivateFile, downloadPrivateFile, esc, fmtDate, today, toast, confirmDialog, openForm, infoDialog,
-    resourcePanel, thumb,
+    resourcePanel, thumb, docTiles, filterBar, query,
     registerSection(key, section) { SECTIONS[key] = { group: 'membership', ...section }; },
+    fmtDateTime: (v) => (v ? new Date(v).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''),
     refreshBadges: () => refreshBadges(),
   };
 
@@ -841,8 +908,9 @@
         el.textContent = n;
         el.hidden = !n;
       };
-      set('applications', (o.applications.pending || 0) + (o.applications.under_review || 0));
+      set('applications', o.applications.pending || 0);
       set('renewals', o.pending_renewals);
+      set('registrations', (await api('GET', '/events/admin/overview')).pending_registrations);
     } catch (err) { /* badges are optional */ }
   }
 

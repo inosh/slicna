@@ -6,15 +6,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultEl = document.getElementById('status-result');
 
   const LABELS = {
-    pending: 'Received', under_review: 'Under review', more_info_required: 'More information needed',
+    pending: 'Received', more_info_required: 'More information needed',
     approved: 'Approved', rejected: 'Not approved',
   };
-  const STAGE = { pending: 1, under_review: 2, more_info_required: 2, approved: 3, rejected: 3 };
+
+  // Received -> Approved / Not approved; "More info needed" appears in between only when it applies.
+  function trackSteps(status) {
+    const last = status === 'rejected' ? 'Not approved' : 'Approved';
+    if (status === 'more_info_required') return { labels: ['Received', 'More info needed', last], done: 2 };
+    return { labels: ['Received', last], done: status === 'pending' ? 1 : 2 };
+  }
 
   function render(s) {
-    const stage = STAGE[s.status];
-    const track = ['Received', 'Under review', s.status === 'rejected' ? 'Decision' : 'Approved']
-      .map((label, i) => `<li class="${i < stage ? 'is-done' : ''}">${label}</li>`).join('');
+    const { labels, done } = trackSteps(s.status);
+    const track = labels.map((label, i) => `<li class="${i < done ? 'is-done' : ''}">${label}</li>`).join('');
 
     let body = '';
     if (s.status === 'approved') {
@@ -30,8 +35,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const cls = s.status === 'more_info_required' || s.status === 'rejected' ? 'callout callout-warn' : 'callout';
       body += `<div class="${cls}" style="margin-top:20px"><strong>Message from SLICNA</strong><p style="margin:6px 0 0">${esc(s.status_note).replace(/\n/g, '<br>')}</p></div>`;
     }
-    if (s.status === 'more_info_required') {
-      body += `<p class="muted" style="margin-top:16px">Please reply by email to <a href="mailto:slicna2022@gmail.com?subject=${encodeURIComponent('Application ' + s.reference_number)}">slicna2022@gmail.com</a> quoting your reference number <strong>${esc(s.reference_number)}</strong>, or call 077 353 6178.</p>`;
+    // Same sentence as in the email; the secretary's email and phone become links.
+    if (s.follow_up) {
+      const f = s.follow_up;
+      let html = esc(f.message)
+        .replace(esc(f.email), `<a href="mailto:${esc(f.email)}?subject=${encodeURIComponent('Application ' + s.reference_number)}">${esc(f.email)}</a>`)
+        .replace(esc(s.reference_number), `<strong>${esc(s.reference_number)}</strong>`);
+      if (f.phone_display) html = html.replace(esc(f.phone_display), `<a href="tel:${esc(f.phone)}">${esc(f.phone_display)}</a>`);
+      body += `<p class="muted" style="margin-top:16px">${html}</p>`;
     }
 
     resultEl.innerHTML = `

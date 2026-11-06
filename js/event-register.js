@@ -1,0 +1,299 @@
+// CPD event registration. Members check their membership first (number +
+// NIC) so the fee for their category is applied; non-members pay the
+// non-member fee. Paid registrations upload the payment slip.
+document.addEventListener('DOMContentLoaded', async () => {
+  const esc = SLICNA.escapeHtml;
+  const MS = SLICNA_MEMBERSHIP;
+  const id = new URLSearchParams(window.location.search).get('id');
+  const form = document.getElementById('reg-form');
+  const statusEl = document.getElementById('reg-status');
+  const $ = (sel) => document.getElementById(sel);
+
+  let event = null;
+  try {
+    event = id ? await SLICNA_API.event(id) : null;
+  } catch (err) { /* handled below */ }
+
+  if (!event) {
+    $('reg-title').textContent = 'Event not found';
+    showClosed('This event may have been removed.');
+    return;
+  }
+
+  document.title = `Register: ${event.title} | SLICNA`;
+  $('reg-title').textContent = event.title;
+  $('crumb-event').textContent = event.title.length > 40 ? event.title.slice(0, 40) + '…' : event.title;
+  $('crumb-event').href = `/pages/event-detail.html?id=${encodeURIComponent(event.id)}`;
+  $('reg-lede').textContent = [SLICNA.formatDate(event.event_date) + (event.end_date ? ' – ' + SLICNA.formatDate(event.end_date) : ''), event.time_text, event.location].filter(Boolean).join(' · ');
+
+  const state = { type: null, member: null, fee: null };
+  const money = (n) => (Number(n) ? SLICNA.formatMoney(n) : 'Free');
+
+  function renderSummary() {
+    const facts = [
+      ['Date', SLICNA.formatDate(event.event_date) + (event.end_date ? ' – ' + SLICNA.formatDate(event.end_date) : '')],
+      ['Time', event.time_text], ['Venue', event.location],
+      ['CPD points', event.cpd_points != null ? SLICNA.formatPoints(event.cpd_points) : null],
+      ['Who can attend', event.audience_label],
+    ].filter(([, v]) => v);
+    $('reg-summary').innerHTML = `
+      <p class="eyebrow" style="margin-bottom:6px">You're registering for</p>
+      <h2 class="summary-title">${esc(event.title)}</h2>
+      <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+      <div class="event-fees"><h3>Event fee</h3>${event.fees.length
+        ? `<ul class="fee-list">${event.fees.map((f) => `<li><span>${esc(f.label)}</span><b>${esc(money(f.amount))}</b></li>`).join('')}</ul>`
+        : '<p class="fee-free">Free of charge</p>'}</div>
+      ${state.fee !== null ? `<div class="your-fee"><span>Your fee</span><b>${esc(money(state.fee))}</b></div>` : ''}`;
+  }
+
+  function showClosed(message) {
+    $('reg-closed').innerHTML = `
+      <h2 style="font-size:24px">Registration is not open</h2>
+      <p class="muted">${esc(message)}</p>
+      <p><a class="btn btn-teal" href="${event ? `/pages/event-detail.html?id=${encodeURIComponent(event.id)}` : '/pages/events.html'}">Back to the event</a></p>`;
+    $('reg-closed').hidden = false;
+  }
+
+  renderSummary();
+  if (!event.registration_open) {
+    showClosed(event.is_past ? 'This event has ended.' : `${event.status_label || 'Registration is closed'}. Please check back later.`);
+    return;
+  }
+  form.hidden = false;
+
+  const membersOnly = event.fee_by_category.NM === null;
+  if (membersOnly) {
+    $('non-member-choice').hidden = true;
+    $('members-only-note').hidden = false;
+    form.querySelector('[name="registrant_type"][value="member"]').checked = true;
+  }
+
+  // ---------- Steps ----------
+
+  function setFee(fee) {
+    state.fee = fee;
+    const paid = fee !== null && fee > 0;
+    $('payment-step').hidden = fee === null;
+    $('payment-paid').hidden = !paid;
+    $('payment-free').hidden = paid;
+    $('payment_date').required = paid;
+    $('receipt').required = paid;
+    if (paid) {
+      $('amount-due').textContent = SLICNA.formatMoney(fee);
+      if (!$('bank-details').innerHTML && event.bank) $('bank-details').innerHTML = MS.bankBox(event.bank);
+    }
+    renderSummary();
+  }
+
+  function showDetails(show) {
+    $('details-step').hidden = !show;
+    if (!show) setFee(null);
+  }
+
+  function chooseType(type) {
+    state.type = type;
+    state.member = null;
+    $('member-result').hidden = true;
+    $('member-check').hidden = type !== 'member';
+    const nic = $('nic_number');
+    nic.readOnly = false;
+    $('nic-field').classList.remove('is-locked');
+    if (type === 'non_member') {
+      showDetails(true);
+      setFee(event.fee_by_category.NM);
+    } else {
+      showDetails(false);
+    }
+  }
+
+  form.querySelectorAll('[name="registrant_type"]').forEach((r) => r.addEventListener('change', () => chooseType(r.value)));
+  if (membersOnly) chooseType('member');
+
+  // ---------- Membership check ----------
+
+  function memberResult(html, ok) {
+    const el = $('member-result');
+    el.className = 'member-result ' + (ok ? 'is-ok' : 'is-warn');
+    el.innerHTML = html;
+    el.hidden = false;
+  }
+
+  $('check-btn').addEventListener('click', async () => {
+    const number = $('membership_number').value.trim();
+    const nic = $('member_nic').value.trim().replace(/\s/g, '');
+    if (!number || !nic) return memberResult('Please enter your membership number and NIC.', false);
+    if (!/^(\d{9}[VvXx]|\d{12})$/.test(nic)) return memberResult('Enter your NIC as 12 digits, or 9 digits followed by V or X.', false);
+    const btn = $('check-btn');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    try {
+      const q = await SLICNA_API.eventMemberCheck(event.id, number, nic);
+      if (!q.eligible) {
+        state.member = null;
+        showDetails(false);
+        memberResult(`<b>${esc(q.name_with_initials)}</b> · ${esc(q.category_label)}<br>${esc(q.message)}
+          ${!membersOnly ? '<p style="margin:10px 0 0"><button type="button" class="btn btn-light btn-sm" data-as-non-member>Register as a non-member</button> <a class="link-arrow" href="/pages/membership-renew.html">Renew my membership</a></p>' : '<p style="margin:10px 0 0"><a class="link-arrow" href="/pages/membership-renew.html">Renew my membership</a></p>'}`, false);
+        return;
+      }
+      state.member = { ...q, nic };
+      memberResult(`<span class="check-mark" aria-hidden="true">✓</span>
+        <span><b>${esc(q.name_with_initials)}</b> · ${esc(q.membership_number)}<br>${esc(q.category_label)} · your fee: <b>${esc(money(q.fee))}</b></span>`, true);
+      const nicInput = $('nic_number');
+      nicInput.value = nic.toUpperCase();
+      nicInput.readOnly = true;
+      $('nic-field').classList.add('is-locked');
+      showDetails(true);
+      setFee(q.fee);
+      $('full_name').focus();
+    } catch (err) {
+      state.member = null;
+      showDetails(false);
+      memberResult(esc(err.message), false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Check my membership';
+    }
+  });
+
+  $('member-result').addEventListener('click', (e) => {
+    if (!e.target.closest('[data-as-non-member]')) return;
+    const nic = $('member_nic').value.trim();
+    form.querySelector('[name="registrant_type"][value="non_member"]').checked = true;
+    chooseType('non_member');
+    if (nic) $('nic_number').value = nic.toUpperCase();
+  });
+
+  // Changing the number or NIC after a successful check needs a new check.
+  ['membership_number', 'member_nic'].forEach((name) => $(name).addEventListener('input', () => {
+    if (!state.member) return;
+    state.member = null;
+    $('member-result').hidden = true;
+    $('nic_number').readOnly = false;
+    $('nic-field').classList.remove('is-locked');
+    showDetails(false);
+  }));
+  $('member_nic').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      $('check-btn').click();
+    }
+  });
+
+  // ---------- Name on certificate ----------
+
+  const certSame = $('cert-same');
+  const syncCert = () => {
+    $('certificate_name').readOnly = certSame.checked;
+    if (certSame.checked) $('certificate_name').value = $('full_name').value;
+  };
+  certSame.addEventListener('change', syncCert);
+  $('full_name').addEventListener('input', syncCert);
+  syncCert();
+
+  MS.bindFilePreview($('receipt'));
+
+  // ---------- Validation and submit ----------
+
+  function clearErrors() {
+    form.querySelectorAll('.field.has-error').forEach((f) => f.classList.remove('has-error'));
+    form.querySelectorAll('.field-error').forEach((m) => m.remove());
+  }
+  function setError(el, message) {
+    const field = el.closest('.field');
+    if (!field) return;
+    field.classList.add('has-error');
+    const msg = document.createElement('p');
+    msg.className = 'field-error';
+    msg.textContent = message;
+    field.appendChild(msg);
+  }
+  form.addEventListener('input', (e) => {
+    const field = e.target.closest('.field.has-error');
+    if (field) {
+      field.classList.remove('has-error');
+      field.querySelectorAll('.field-error').forEach((m) => m.remove());
+    }
+  });
+
+  function validate() {
+    clearErrors();
+    const problems = [];
+    const visible = [...form.querySelectorAll('#details-step input, #details-step textarea, #payment-step input')]
+      .filter((el) => !el.closest('[hidden]') && el.type !== 'radio' && el.type !== 'checkbox');
+    visible.forEach((el) => {
+      if (el.type === 'file') {
+        if (el.required && !el.files.length) problems.push([el, 'Please upload your payment slip.']);
+        else if (el.files.length) {
+          const problem = MS.fileProblem(el, { pdf: true });
+          if (problem) problems.push([el, problem]);
+        }
+        return;
+      }
+      const v = el.value.trim();
+      if (el.required && !v) return problems.push([el, 'This is required.']);
+      if (!v) return;
+      if ('nic' in el.dataset && !/^(\d{9}[VvXx]|\d{12})$/.test(v.replace(/\s/g, ''))) problems.push([el, 'Enter 12 digits, or 9 digits followed by V or X.']);
+      if (el.dataset.phone && !/^(?:\+94|0)7[0-8][0-9]{7}$/.test(v.replace(/[\s-]/g, ''))) problems.push([el, 'Enter a mobile number like 07XXXXXXXX or +947XXXXXXXX.']);
+      if (el.type === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) problems.push([el, 'Please enter a valid email address.']);
+      if (el.type === 'date' && v > new Date().toISOString().slice(0, 10)) problems.push([el, 'This date cannot be in the future.']);
+    });
+    problems.forEach(([el, msg]) => setError(el, msg));
+    if (problems.length) {
+      const first = problems[0][0];
+      first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (first.type !== 'file') first.focus({ preventScroll: true });
+    }
+    return !problems.length;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    statusEl.className = 'form-status';
+    if (!state.type || state.fee === null) {
+      SLICNA_FORM_ERRORS.showError(form, statusEl, state.type === 'member' ? 'Please check your membership first.' : 'Please choose whether you are a member.');
+      return;
+    }
+    if (!validate()) return;
+
+    const data = new FormData(form);
+    data.set('registrant_type', state.type);
+    if (state.type === 'member') {
+      data.set('membership_number', state.member.membership_number);
+      data.set('nic_number', state.member.nic);
+    } else {
+      data.delete('membership_number');
+    }
+    if (!(state.fee > 0)) ['pay_by', 'payment_date', 'receipt'].forEach((k) => data.delete(k));
+    else if (!$('receipt').files.length) data.delete('receipt');
+
+    const button = $('submit-btn');
+    button.disabled = true;
+    button.textContent = 'Submitting…';
+    try {
+      const result = await SLICNA_API.registerForEvent(event.id, data);
+      showDone(result);
+    } catch (err) {
+      SLICNA_FORM_ERRORS.showError(form, statusEl, err.message);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Submit registration';
+    }
+  });
+
+  function showDone(result) {
+    form.hidden = true;
+    $('reg-done').innerHTML = `
+      <div class="done-mark" aria-hidden="true">✓</div>
+      <h2>Registration received</h2>
+      <p>Thank you. Your registration for <strong>${esc(result.event_title)}</strong> has been sent to SLICNA.</p>
+      <div class="ref-box"><span>Your reference</span><b>${esc(result.reference_number)}</b></div>
+      <ul class="check-list">
+        ${Number(result.amount_due) > 0 ? `<li>We'll check your payment of ${esc(SLICNA.formatMoney(result.amount_due))}.</li>` : ''}
+        <li>You'll get an email at <strong>${esc(result.email)}</strong> once your place is confirmed.</li>
+        <li>Questions? Call 071 338 5768 or email slicna2022@gmail.com and quote your reference.</li>
+      </ul>
+      <p style="margin-top:22px"><a class="btn btn-teal" href="/pages/events.html">See other events</a></p>`;
+    $('reg-done').hidden = false;
+    SLICNA_FORM_ERRORS.focusOn($('reg-done'));
+  }
+});

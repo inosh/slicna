@@ -7,26 +7,22 @@ const SLICNA_MEMBERSHIP = (() => {
     LT: {
       name: 'Lifetime Membership', short: 'Lifetime',
       who: 'Nurses with a Post Basic College of Nursing (PBCN) ICU diploma or certificate, or more than 10 years continuously in intensive care.',
-      needs: 'Your PBCN details or ICU experience. No recommendation needed.',
-      endorsement: null,
+      needs: 'Your PBCN ICU training details, SLNC registration and a passport-size photo.',
     },
     GM: {
       name: 'General Membership', short: 'General',
       who: 'Nurses working in a government hospital intensive care unit.',
-      needs: 'A recommendation signed by a SLICNA Lifetime member.',
-      endorsement: 'lt',
+      needs: 'Your SLNC registration, current workplace and a passport-size photo.',
     },
     OM: {
       name: 'Ordinary Membership', short: 'Ordinary',
       who: 'Nurses employed at any government hospital.',
-      needs: 'A recommendation signed by a SLICNA Lifetime member.',
-      endorsement: 'lt',
+      needs: 'Your SLNC registration, current workplace and a passport-size photo.',
     },
     PM: {
       name: 'Partial Membership', short: 'Partial',
       who: 'Nursing students at a nursing school or university.',
-      needs: 'A letter certified by your nursing school or university.',
-      endorsement: 'institution',
+      needs: 'Your student number, institution details and a passport-size photo.',
     },
   };
   const ORDER = ['LT', 'GM', 'OM', 'PM'];

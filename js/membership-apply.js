@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ---------- Steps ----------
 
-  const steps = () => allPanels.filter((p) => !(p.dataset.step === 'endorsement' && category === 'LT'));
+  const steps = () => allPanels;
 
   function renderStepper() {
     stepperEl.innerHTML = steps().map((p, i) => `<li class="${i < current ? 'is-done' : i === current ? 'is-current' : ''}"${i === current ? ' aria-current="step"' : ''}>${p.dataset.title}</li>`).join('');
@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     current = Math.max(0, Math.min(index, list.length - 1));
     allPanels.forEach((p) => { p.hidden = p !== list[current]; });
     if (list[current].dataset.step === 'review') buildReview();
-    if (list[current].dataset.step === 'endorsement') updateDownloadLinks();
     backBtn.style.visibility = current === 0 ? 'hidden' : 'visible';
     nextBtn.textContent = current === list.length - 1 ? 'Submit application' : 'Continue';
     renderStepper();
@@ -124,15 +123,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (cleaned !== nicInput.value) nicInput.value = cleaned;
   });
 
-  function updateDownloadLinks() {
-    const name = [val('title'), val('name_with_initials') || val('full_name')].filter(Boolean).join(' ');
-    const params = new URLSearchParams({ category: category || '', name });
-    document.getElementById('download-lt-page').href = `/pages/membership-recommendation.html?${params}`;
-    params.set('student', val('student_number'));
-    params.set('full_name', val('full_name'));
-    document.getElementById('download-pm-page').href = `/pages/membership-recommendation.html?${params}`;
-  }
-
   // ---------- Values ----------
 
   function val(name) {
@@ -143,13 +133,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const checked = (name) => Boolean(form.querySelector('[name="' + name + '"]:checked'));
-
-  // The recommendation inputs for this category (Lifetime member or institution).
-  // Only the other category's block is excluded: the step panel itself may be
-  // hidden (e.g. on the review step) and its values are still needed.
-  function endorserInputs() {
-    return [...form.querySelectorAll('[data-name]')].filter((el) => !el.closest('[data-only][hidden]'));
-  }
 
   // ---------- Validation ----------
 
@@ -230,8 +213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     draftTimer = setTimeout(() => {
       const data = {};
       form.querySelectorAll('input, select, textarea').forEach((el) => {
-        // Recommendation inputs share backend names between two sets, so they're saved by id.
-        const key = el.name || (el.dataset.name ? el.id : '');
+        const key = el.name;
         if (el.type === 'checkbox' && el.dataset.toggles) { if (el.checked) data[el.name] = 'true'; return; }
         if (!key || el.type === 'file' || el.type === 'checkbox') return;
         if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
@@ -274,7 +256,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>`;
     const c = MS.CATEGORIES[category];
     const isPm = category === 'PM';
-    const endorser = Object.fromEntries(endorserInputs().map((el) => [el.dataset.name, el.value.trim()]));
 
     document.getElementById('review').innerHTML = [
       group('Category', 'category', [row('Membership', `${c.name} (${category})`), row('Fee', document.getElementById('fee-amount').textContent + ' ' + document.getElementById('fee-period').textContent)]),
@@ -293,13 +274,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         category === 'LT' ? row('ICU training', [val('icu_training_type'), val('icu_training_batch'), val('icu_training_year')].filter(Boolean).join(', ')) : '',
         row('Higher qualifications', val('higher_qualifications')),
       ]),
-      category !== 'LT' ? group(isPm ? 'Certification' : 'Recommendation', 'endorsement', isPm ? [
-        row('Institution', endorser.endorser_workplace), row('Signed by', [endorser.endorser_name, endorser.endorser_designation].filter(Boolean).join(', ')),
-        row('Contact', endorser.endorser_contact), row('Signed page', fileName('endorsement')),
-      ] : [
-        row('Lifetime member', endorser.endorser_name), row('LT number', endorser.endorser_membership_number),
-        row('Contact', endorser.endorser_contact), row('Workplace', endorser.endorser_workplace), row('Signed page', fileName('endorsement')),
-      ]) : '',
       group('Photo & payment', 'payment', [row('Photo', fileName('photo')), row('Payment date', val('payment_date')), row('Payment slip', fileName('receipt'))]),
     ].join('');
   }
@@ -315,16 +289,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const status = document.getElementById('submit-status');
     const declaration = document.getElementById('declaration');
     if (!declaration.checked) {
-      status.className = 'form-status is-error';
-      status.textContent = 'Please confirm that your details are true.';
+      SLICNA_FORM_ERRORS.showError(form, status, 'Please confirm that your details are true.');
       return;
     }
 
     const data = new FormData(form);
-    if (category === 'LT') data.delete('endorsement');
-    endorserInputs().forEach((el) => data.set(el.dataset.name, el.value.trim()));
     data.set('nic_number', val('nic_number').replace(/\s/g, '').toUpperCase());
-    ['photo', 'receipt', 'endorsement'].forEach((name) => {
+    ['photo', 'receipt'].forEach((name) => {
       const file = data.get(name);
       if (file && !file.size) data.delete(name);
     });
@@ -348,10 +319,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         <p class="muted" style="max-width:52ch;margin:16px auto">Please keep this number. We have also emailed it to you. The committee will check your details and payment, and you'll hear from us by email. You can check progress at any time with this number and your NIC.</p>
         <p><a class="btn btn-teal" href="/pages/membership-status.html?ref=${encodeURIComponent(result.reference_number)}">Check application status</a></p>`;
       success.hidden = false;
-      success.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      SLICNA_FORM_ERRORS.focusOn(success);
     } catch (err) {
-      status.className = 'form-status is-error';
-      status.textContent = err.message;
+      // Under the field when it's on this step; otherwise in the message box. Focus follows.
+      SLICNA_FORM_ERRORS.showError(form, status, err.message);
       nextBtn.disabled = false;
       backBtn.disabled = false;
       nextBtn.textContent = 'Submit application';

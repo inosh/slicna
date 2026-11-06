@@ -21,21 +21,28 @@
       <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / Learning / Events</nav>
       <p class="eyebrow">Events &amp; workshops</p>
       <h1>Learn, take part, connect</h1>
-      <p class="lede">CPD programmes, international workshops and community events, all in one place.</p>
+      <p class="lede">CPD events for critical care nurses, and our AGMs and community events. Register online for CPD events while registration is open.</p>
     </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0" id="spotlight-wrap" hidden>
+    <div class="wrap"><div id="spotlight"></div></div>
   </section>
 
   <section class="section-tight" style="padding-top:0">
     <div class="wrap">
-      <div class="chips" role="group" aria-label="Filter events">
-        <button class="chip" type="button" data-when="upcoming" aria-pressed="true">Upcoming</button>
-        <button class="chip" type="button" data-when="past" aria-pressed="false">Past</button>
-        <span style="width:1px;background:var(--line);margin:0 6px"></span>
-        <button class="chip" type="button" data-cat="all" aria-pressed="true">All</button>
-        <button class="chip" type="button" data-cat="cpd" aria-pressed="false">CPD</button>
-        <button class="chip" type="button" data-cat="international" aria-pressed="false">International</button>
-        <button class="chip" type="button" data-cat="community" aria-pressed="false">Community</button>
+      <div class="events-toolbar">
+        <div class="seg" role="group" aria-label="Event kind">
+          <label><input type="radio" name="kind" value="cpd" checked> CPD Events</label>
+          <label><input type="radio" name="kind" value="other"> Other Events</label>
+          <label><input type="radio" name="kind" value="all"> All</label>
+        </div>
+        <div class="seg" role="group" aria-label="When">
+          <label><input type="radio" name="when" value="upcoming" checked> Upcoming</label>
+          <label><input type="radio" name="when" value="past"> Past</label>
+        </div>
       </div>
+      <p class="muted events-count" id="events-count" aria-live="polite"></p>
       <div class="event-list" id="events-list"><div class="skeleton"></div><div class="skeleton"></div></div>
     </div>
   </section>

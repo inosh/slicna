@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const events = await SLICNA_API.events();
     // Show the latest year that has CPD programmes.
-    const withPoints = events.filter((e) => e.cpd_points);
+    const withPoints = events.filter((e) => e.category === 'cpd' && e.cpd_points);
     const year = Math.max(...withPoints.map((e) => SLICNA.parseDate(e.event_date)?.getFullYear() || 0));
     const list = withPoints.filter((e) => SLICNA.parseDate(e.event_date)?.getFullYear() === year);
     const total = list.reduce((sum, e) => sum + Number(e.cpd_points), 0);

@@ -53,7 +53,6 @@ Fixed text such as the hero, mission and vision, and partners stays in the HTML.
 |---|---|
 | `pages/membership.html` | The four categories with live fees, a "which membership is right for me?" helper, benefits, how to join, bank details |
 | `pages/membership-apply.html` | Step-by-step application (`?category=GM` preselects). Fields adapt to the category; text answers are kept as a draft in the browser |
-| `pages/membership-recommendation.html` | Printable recommendation page (GM/OM) or institution certification page (PM), prefilled with the applicant's name |
 | `pages/membership-status.html` | Application status by reference + NIC (`?ref=` prefills) |
 | `pages/membership-renew.html` | Renew or upgrade, from a personal renewal link (`?t=`) or membership number + NIC |
 

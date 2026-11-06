@@ -4,12 +4,12 @@
 (() => {
   const A = window.SLICNA_ADMIN;
   if (!A) return;
-  const { api, esc, fmtDate, today, toast, confirmDialog, openForm, infoDialog } = A;
+  const { api, esc, fmtDate, today, toast, confirmDialog, openForm, infoDialog, docTiles, filterBar, query } = A;
 
   const BASE = '/membership/admin';
   const CATEGORIES = { LT: 'Lifetime', GM: 'General', OM: 'Ordinary', PM: 'Partial' };
   const CATEGORY_OPTIONS = Object.entries(CATEGORIES).map(([k, v]) => [k, `${v} (${k})`]);
-  const APP_STATUS = { pending: 'Pending', under_review: 'Under review', more_info_required: 'More info needed', approved: 'Approved', rejected: 'Rejected' };
+  const APP_STATUS = { pending: 'Pending', more_info_required: 'More info needed', approved: 'Approved', rejected: 'Rejected' };
   const MEMBER_STATE = { active: 'Active', renewal_due: 'Renewal due', grace: 'Grace period', lapsed: 'Lapsed', deactivated: 'Deactivated' };
   const REMINDER_KINDS = { notice_30: 'First reminder', notice_7: '7-day reminder', expired: 'Expired (grace started)', grace_ending: 'Grace ending', lapsed: 'Lapsed notice' };
 
@@ -25,72 +25,6 @@
   const html = (s) => ({ html: s });
   const fmtDateTime = (v) => (v ? new Date(v).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 
-  // Document tile with a preview for images; click opens the file in a new tab.
-  async function docTiles(container, docs) {
-    const objectUrls = [];
-    container.innerHTML = docs.length ? `<div class="doc-tiles">${docs.map((d, i) => `
-      <div class="doc-tile">
-        <button type="button" class="doc-preview" data-doc="${i}" title="Open ${esc(d.label)}">Loading…</button>
-        <div class="doc-label">${esc(d.label)} <button type="button" class="copy-btn" data-doc="${i}">Open</button></div>
-      </div>`).join('')}</div>` : '<p class="admin-muted">No documents.</p>';
-    container.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-doc]');
-      if (btn) A.openPrivateFile(docs[Number(btn.dataset.doc)].path);
-    });
-    await Promise.all(docs.map(async (d, i) => {
-      const preview = container.querySelector(`.doc-preview[data-doc="${i}"]`);
-      try {
-        const blob = await A.apiBlob(d.path);
-        if (blob.type.startsWith('image/')) {
-          const url = URL.createObjectURL(blob);
-          objectUrls.push(url);
-          preview.innerHTML = `<img src="${url}" alt="">`;
-        } else {
-          preview.textContent = blob.type === 'application/pdf' ? 'PDF document' : 'File';
-        }
-      } catch (err) {
-        preview.textContent = 'Could not load';
-      }
-    }));
-    return () => objectUrls.forEach((u) => URL.revokeObjectURL(u));
-  }
-
-  function filterBar(host, { chips, chipKey, selects = [], search = true, onChange, actions = '' }) {
-    const state = { [chipKey]: chips[0][0] };
-    host.innerHTML = `
-      <div class="admin-filters">
-        ${chips.map(([v, label], i) => `<button type="button" class="chip" data-chip="${esc(v)}" aria-pressed="${i === 0}">${esc(label)}</button>`).join('')}
-        ${selects.map((s) => `<select data-select="${s.key}" aria-label="${esc(s.label)}"><option value="">${esc(s.label)}: all</option>${s.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>`).join('')}
-        ${search ? '<input type="search" data-search placeholder="Search name, NIC, number…" aria-label="Search">' : ''}
-        ${actions}
-      </div>`;
-    let timer = null;
-    host.addEventListener('click', (e) => {
-      const c = e.target.closest('[data-chip]');
-      if (!c) return;
-      host.querySelectorAll('[data-chip]').forEach((b) => b.setAttribute('aria-pressed', String(b === c)));
-      state[chipKey] = c.dataset.chip;
-      onChange(state);
-    });
-    host.addEventListener('change', (e) => {
-      const s = e.target.closest('[data-select]');
-      if (s) { state[s.dataset.select] = s.value; onChange(state); }
-    });
-    host.addEventListener('input', (e) => {
-      if (!e.target.matches('[data-search]')) return;
-      clearTimeout(timer);
-      timer = setTimeout(() => { state.q = e.target.value.trim(); onChange(state); }, 300);
-    });
-    return state;
-  }
-
-  const query = (obj) => {
-    const p = new URLSearchParams();
-    Object.entries(obj).forEach(([k, v]) => { if (v && v !== 'all') p.set(k, v); });
-    const s = p.toString();
-    return s ? '?' + s : '';
-  };
-
   // =====================================================================
   // Applications
   // =====================================================================
@@ -99,32 +33,41 @@
     const card = document.createElement('section');
     card.className = 'admin-card';
     main.appendChild(card);
-    card.innerHTML = '<div class="admin-card-head"><div><h2>Membership applications</h2><p>Click an application to review its details, photo, payment slip and recommendation.</p></div></div><div data-filters></div><div data-list></div>';
+    card.innerHTML = '<div class="admin-card-head"><div><h2>Membership applications</h2><p>Click an application to review its details, photo and payment slip.</p></div></div><div data-filters></div><div data-list></div>';
     const listEl = card.querySelector('[data-list]');
 
     const filters = filterBar(card.querySelector('[data-filters]'), {
       chipKey: 'status',
-      chips: [['open', 'Needs action'], ['pending', 'Pending'], ['under_review', 'Under review'], ['more_info_required', 'More info needed'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['all', 'All']],
+      chips: [['pending', 'Pending'], ['id_application', 'ID Application'], ['more_info_required', 'More Info Needed'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['all', 'All']],
       selects: [{ key: 'category', label: 'Category', options: CATEGORY_OPTIONS }],
       onChange: load,
     });
 
+    // "Pending (2)", "ID Application (1)"…: counts follow the category and search filters.
+    async function updateCounts() {
+      try {
+        const counts = await api('GET', `${BASE}/applications/counts${query({ category: filters.category, q: filters.q })}`);
+        card.querySelectorAll('[data-chip]').forEach((c) => {
+          c.textContent = `${c.dataset.label} (${counts[c.dataset.chip] || 0})`;
+        });
+      } catch (err) { /* keep the plain labels */ }
+    }
+
     async function load() {
       listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
       try {
-        const status = filters.status === 'open' ? '' : filters.status;
-        let rows = await api('GET', `${BASE}/applications${query({ status, category: filters.category, q: filters.q })}`);
-        if (filters.status === 'open') rows = rows.filter((r) => ['pending', 'under_review'].includes(r.status));
+        const rows = await api('GET', `${BASE}/applications${query({ status: filters.status, category: filters.category, q: filters.q })}`);
+        updateCounts();
         listEl.innerHTML = rows.length ? `
           <div class="admin-table-wrap"><table class="admin-table">
             <thead><tr><th>Received</th><th>Reference</th><th>Applicant</th><th>Category</th><th>Status</th></tr></thead>
             <tbody>${rows.map((r) => `
               <tr class="is-clickable" data-id="${r.id}" tabindex="0">
                 <td>${esc(fmtDate(r.created_at))}</td>
-                <td>${esc(r.reference_number)}</td>
+                <td>${esc(r.reference_number)}${r.membership_number ? `<div class="admin-muted">${esc(r.membership_number)}</div>` : ''}</td>
                 <td class="main-col">${esc(r.name_with_initials)}<div class="admin-muted">${esc(r.nic_number)} · ${esc(r.current_working_place || '')}</div></td>
                 <td>${esc(CATEGORIES[r.category])} (${esc(r.category)})</td>
-                <td>${chip(r.status, APP_STATUS[r.status])}</td>
+                <td>${chip(r.status, APP_STATUS[r.status])}${r.member_id ? `<div class="admin-muted" style="margin-top:4px">ID application ${r.id_application_created_at ? 'created' : 'pending'}</div>` : ''}</td>
               </tr>`).join('')}</tbody>
           </table></div>` : '<p class="admin-empty">No applications here.</p>';
       } catch (err) {
@@ -134,16 +77,18 @@
 
     listEl.addEventListener('click', (e) => {
       const tr = e.target.closest('tr[data-id]');
-      if (tr) reviewApplication(Number(tr.dataset.id), load);
+      if (tr) reviewApplication(Number(tr.dataset.id), load, { idApplication: filters.status === 'id_application' });
     });
     listEl.addEventListener('keydown', (e) => {
       const tr = e.target.closest('tr[data-id]');
-      if (tr && e.key === 'Enter') reviewApplication(Number(tr.dataset.id), load);
+      if (tr && e.key === 'Enter') reviewApplication(Number(tr.dataset.id), load, { idApplication: filters.status === 'id_application' });
     });
     load();
   }
 
-  async function reviewApplication(id, onChanged) {
+  // idApplication: opened from the "ID Application" tab, which is the only place
+  // the ID application panel (download and confirm) is shown.
+  async function reviewApplication(id, onChanged, { idApplication = false } = {}) {
     let cleanup = () => {};
     const view = infoDialog({ title: 'Application', onClose: () => cleanup() });
     view.body.innerHTML = '<p class="admin-muted">Loading…</p>';
@@ -157,18 +102,9 @@
     view.dialog.querySelector('.dialog-head h2').textContent = `${a.reference_number} · ${CATEGORIES[a.category]} (${a.category})`;
     const isPm = a.category === 'PM';
 
-    let endorserBadge = '';
-    if (a.endorser_check) {
-      const c = a.endorser_check;
-      endorserBadge = !c.found
-        ? '<span class="check-badge check-bad">LT number not found in the member directory</span>'
-        : !c.is_lifetime
-          ? `<span class="check-badge check-bad">${esc(c.membership_number)} is not a Lifetime member</span>`
-          : `<span class="check-badge ${c.active ? 'check-ok' : 'check-warn'}">${esc(c.membership_number)}: ${esc(c.name)}${c.active ? '' : ' (deactivated)'}</span>`;
-    }
-
     const locked = a.status === 'approved';
     view.body.innerHTML = `
+      ${idApplication && locked && a.member ? idApplicationPanel(a) : ''}
       <div class="detail-grid">
         <div>
           <div class="detail-section"><h3>Applicant</h3>${dl([
@@ -187,15 +123,8 @@
             ['ICU training', [a.icu_training_type, a.icu_training_batch, a.icu_training_year].filter(Boolean).join(', ')],
             ['Higher qualifications', a.higher_qualifications],
           ])}</div>
-          ${a.category !== 'LT' ? `<div class="detail-section"><h3>${isPm ? 'Institution certification' : 'Recommended by'}</h3>${dl(isPm ? [
-            ['Institution', a.endorser_workplace], ['Signing officer', [a.endorser_name, a.endorser_designation].filter(Boolean).join(', ')], ['Contact', a.endorser_contact],
-          ] : [
-            ['Lifetime member', a.endorser_name], ['LT number', html(`${esc(a.endorser_membership_number)}<br>${endorserBadge}`)],
-            ['Contact', a.endorser_contact], ['Workplace', a.endorser_workplace],
-          ])}</div>` : ''}
           <div class="detail-section"><h3>Payment</h3>${dl([
             ['Fee due', a.payment_amount != null ? money(a.payment_amount) : ''], ['Paid on', fmtDate(a.payment_date)],
-            ['Reference', 'Applicant was asked to quote their NIC: ' + a.nic_number],
           ])}</div>
         </div>
         <div>
@@ -209,20 +138,21 @@
             ])}
           </div>
           <div class="detail-section"><h3>Documents</h3><div data-docs></div></div>
-          <div class="action-bar">
-            ${locked ? `<button type="button" class="btn btn-teal btn-sm" data-act="open-member">Open member</button>` : `
-              ${['pending', 'more_info_required'].includes(a.status) ? '<button type="button" class="btn btn-light btn-sm" data-act="review">Mark under review</button>' : ''}
-              <button type="button" class="btn btn-light btn-sm" data-act="info">Request more info</button>
-              <button type="button" class="btn btn-teal btn-sm" data-act="approve">Approve…</button>
-              <button type="button" class="btn btn-light btn-sm" data-act="reject">Reject…</button>
-              <button type="button" class="btn btn-danger btn-sm" data-act="delete">Delete</button>`}
-          </div>
+          ${locked ? '' : `<div class="action-bar">
+            ${a.status === 'more_info_required' ? '<button type="button" class="btn btn-light btn-sm" data-act="info-received">Information received</button>' : ''}
+            <button type="button" class="btn btn-light btn-sm" data-act="info">Request more info</button>
+            <button type="button" class="btn btn-teal btn-sm" data-act="approve">Approve…</button>
+            <button type="button" class="btn btn-light btn-sm" data-act="reject">Reject…</button>
+            <button type="button" class="btn btn-danger btn-sm" data-act="delete">Delete</button>
+          </div>`}
         </div>
       </div>`;
 
-    const docs = [{ label: 'Photo', path: `${BASE}/applications/${a.id}/files/photo` }, { label: 'Payment slip', path: `${BASE}/applications/${a.id}/files/receipt` }];
-    if (a.endorsement_key) docs.push({ label: isPm ? 'Certified page' : 'Signed recommendation', path: `${BASE}/applications/${a.id}/files/endorsement` });
-    docTiles(view.body.querySelector('[data-docs]'), docs.filter((d, i) => i > 1 || (i === 0 ? a.photo_key : a.receipt_key))).then((c) => { cleanup = c; });
+    const docs = [
+      a.photo_key && { label: 'Photo', path: `${BASE}/applications/${a.id}/files/photo` },
+      a.receipt_key && { label: 'Payment slip', path: `${BASE}/applications/${a.id}/files/receipt` },
+    ].filter(Boolean);
+    docTiles(view.body.querySelector('[data-docs]'), docs).then((c) => { cleanup = c; });
 
     const done = (message) => {
       toast(message);
@@ -231,20 +161,27 @@
       A.refreshBadges();
     };
     const patch = (fd) => api('PATCH', `${BASE}/applications/${a.id}/status`, fd);
+
+    const idPanel = view.body.querySelector('[data-id-panel]');
+    if (idPanel) {
+      bindIdApplication(idPanel, {
+        base: `${BASE}/applications/${a.id}`,
+        number: a.member.membership_number,
+        name: a.name_with_initials,
+        onConfirmed: () => done('ID application confirmed.'),
+      });
+    }
     const fdOf = (obj) => { const f = new FormData(); Object.entries(obj).forEach(([k, v]) => f.append(k, v)); return f; };
 
-    view.body.querySelector('.action-bar').addEventListener('click', async (e) => {
+    view.body.querySelector('.action-bar')?.addEventListener('click', async (e) => {
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (!act) return;
 
-      if (act === 'open-member') {
-        view.close();
-        memberDetail(a.member.id, () => {});
-      } else if (act === 'review') {
-        if (!(await confirmDialog({ title: 'Mark as under review?', message: `The applicant will see that "${a.reference_number}" is being reviewed${a.email ? ' and get an email' : ''}.`, confirmText: 'Mark under review' }))) return;
+      if (act === 'info-received') {
+        if (!(await confirmDialog({ title: 'Information received?', message: `"${a.reference_number}" moves back to Pending so it can be approved or rejected. Your earlier message is cleared from the applicant's status page.`, confirmText: 'Move to Pending' }))) return;
         try {
-          await patch(fdOf({ status: 'under_review', status_note: '' }));
-          done('Marked as under review.');
+          await patch(fdOf({ status: 'pending', status_note: '' }));
+          done('Moved back to Pending.');
         } catch (err) { toast(err.message, true); }
       } else if (act === 'info') {
         const ok = await openForm({
@@ -296,7 +233,7 @@
           confirmTitle: 'Approve and create the member?',
           confirmMessage: (fd) => {
             const validity = isLt
-              ? 'Lifetime membership, starting today.'
+              ? `Lifetime membership, member since ${fmtDate(submittedOn)} (the submitted date).`
               : `Membership from ${fmtDate(fd.get('joined_on'))} until ${fmtDate(addYear(fd.get('joined_on')))}.`;
             return `${a.name_with_initials} becomes a ${CATEGORIES[a.category]} member (${fd.get('membership_number')}).\n${validity}\n\nThey will be emailed their membership number. An approved application can no longer be changed.`;
           },
@@ -308,6 +245,69 @@
         try {
           await api('DELETE', `${BASE}/applications/${a.id}`);
           done('Application deleted.');
+        } catch (err) { toast(err.message, true); }
+      }
+    });
+  }
+
+  // =====================================================================
+  // ID card application (approved applications only; not in the member directory)
+  // =====================================================================
+
+  const idStatusChip = (createdAt) => (createdAt
+    ? chip('approved', 'ID application created')
+    : chip('pending', 'ID application pending'));
+
+  // Download the form and the photo, check them, then confirm. a: an approved
+  // application with its member (id_application_created_at, has_photo).
+  function idApplicationPanel(a) {
+    const m = a.member;
+    const createdAt = m.id_application_created_at;
+    return `
+      <section class="id-panel" data-id-panel>
+        <div class="id-panel-head">
+          <div>
+            <h3>ID card application · ${esc(m.membership_number)}</h3>
+            <p class="admin-muted">${createdAt
+              ? `Confirmed ${esc(fmtDateTime(createdAt))}${m.id_application_created_by_name ? ' by ' + esc(m.id_application_created_by_name) : ''}. The form and photo can still be downloaded again.`
+              : 'Download the form and the passport-size photo, check them, then confirm.'}</p>
+          </div>
+          ${idStatusChip(createdAt)}
+        </div>
+        <div class="id-docs">
+          <button type="button" class="id-doc" data-id-act="pdf">
+            <span class="id-doc-ico" aria-hidden="true">PDF</span>
+            <span><b>ID application form</b><span>A4 PDF with details and photo</span></span>
+          </button>
+          ${m.has_photo === false ? '' : `
+          <button type="button" class="id-doc" data-id-act="photo">
+            <span class="id-doc-ico id-doc-ico-img" aria-hidden="true">IMG</span>
+            <span><b>Passport photo</b><span>Named for the ID card</span></span>
+          </button>`}
+          ${createdAt ? '' : '<button type="button" class="btn btn-teal id-confirm-btn" data-id-act="confirm">Confirm ID application created</button>'}
+        </div>
+      </section>`;
+  }
+
+  function bindIdApplication(panel, { base, number, name, onConfirmed }) {
+    panel.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-id-act]');
+      if (!btn) return;
+      const act = btn.dataset.idAct;
+      if (act === 'pdf' || act === 'photo') {
+        btn.disabled = true;
+        const ok = await A.downloadPrivateFile(act === 'pdf' ? `${base}/id-application.pdf` : `${base}/id-photo`);
+        btn.disabled = false;
+        if (ok) btn.classList.add('is-done');
+      } else if (act === 'confirm') {
+        if (!(await confirmDialog({
+          title: 'Confirm ID application created?',
+          message: `Records that the ID card application for ${number} (${name}) has been created, with today's date and your name.\n\nOnly confirm after checking the downloaded form and photo.`,
+          confirmText: 'Confirm created',
+        }))) return;
+        try {
+          await api('POST', `${base}/id-application`);
+          onConfirmed();
         } catch (err) { toast(err.message, true); }
       }
     });
@@ -352,7 +352,7 @@
     card.innerHTML = `
       <div class="admin-card-head"><div><h2>Member directory</h2><p>Statuses are worked out from each member's "valid until" date and the grace period, so lapsing happens automatically.</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn btn-light btn-sm" data-export>Export CSV</button>
+          <button type="button" class="btn btn-light btn-sm" data-export>Download Excel</button>
           <button type="button" class="btn btn-coral btn-sm" data-add>Add member</button>
         </div></div>
       <div class="stat-tiles" data-tiles></div>
@@ -362,7 +362,8 @@
     const tilesEl = card.querySelector('[data-tiles]');
     const filters = filterBar(card.querySelector('[data-filters]'), {
       chipKey: 'state',
-      chips: [['', 'All'], ['active', 'Active'], ['renewal_due', 'Renewal due'], ['grace', 'Grace period'], ['lapsed', 'Lapsed'], ['pending_renewal', 'Renewal pending'], ['deactivated', 'Deactivated']],
+      // "Members" is everyone who isn't deactivated (active, renewal due, grace period and lapsed).
+      chips: [['current', 'Members'], ['renewal_due', 'Renewal Due'], ['grace', 'Grace Period'], ['lapsed', 'Lapsed'], ['pending_renewal', 'Renewals to Verify'], ['deactivated', 'Deactivated']],
       selects: [{ key: 'category', label: 'Category', options: CATEGORY_OPTIONS }],
       onChange: load,
     });
@@ -371,10 +372,19 @@
       try {
         const o = await api('GET', `${BASE}/overview`);
         tilesEl.innerHTML = [
-          ['', o.members.total, 'Members'], ['active', o.members.active, 'Active'], ['renewal_due', o.members.renewal_due, 'Renewal due'],
-          ['grace', o.members.grace, 'Grace period'], ['lapsed', o.members.lapsed, 'Lapsed'], ['pending_renewal', o.pending_renewals, 'Renewals to verify'],
+          ['current', o.members.total - o.members.deactivated, 'Members'], ['renewal_due', o.members.renewal_due, 'Renewal Due'],
+          ['grace', o.members.grace, 'Grace Period'], ['lapsed', o.members.lapsed, 'Lapsed'],
+          ['pending_renewal', o.pending_renewals, 'Renewals to Verify'], ['deactivated', o.members.deactivated, 'Deactivated'],
         ].map(([state, n, label]) => `<button type="button" class="stat-tile" data-tile="${state}"><b>${esc(n)}</b><span>${esc(label)}</span></button>`).join('');
       } catch (err) { tilesEl.innerHTML = ''; }
+    }
+
+    // "Members (42)", "Lapsed (5)"…: counts follow the category and search filters.
+    async function updateCounts() {
+      try {
+        const counts = await api('GET', `${BASE}/members/counts${query({ category: filters.category, q: filters.q })}`);
+        card.querySelectorAll('[data-chip]').forEach((c) => { c.textContent = `${c.dataset.label} (${counts[c.dataset.chip] || 0})`; });
+      } catch (err) { /* keep the plain labels */ }
     }
     tilesEl.addEventListener('click', (e) => {
       const t = e.target.closest('[data-tile]');
@@ -386,6 +396,7 @@
       listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
       try {
         const rows = await api('GET', `${BASE}/members${query({ state: filters.state, category: filters.category, q: filters.q })}`);
+        updateCounts();
         listEl.innerHTML = rows.length ? `
           <p class="admin-muted">${rows.length} member${rows.length === 1 ? '' : 's'}</p>
           <div class="admin-table-wrap"><table class="admin-table">
@@ -396,7 +407,7 @@
                 <td class="main-col">${esc(m.name_with_initials)}<div class="admin-muted">${esc(m.nic_number)}${m.mobile ? ' · ' + esc(m.mobile) : ''}</div></td>
                 <td>${esc(CATEGORIES[m.category])}</td>
                 <td>${m.valid_until ? esc(fmtDate(m.valid_until)) : 'Lifetime'}</td>
-                <td>${chip(m.state, MEMBER_STATE[m.state])}${m.has_pending_renewal ? '<div class="admin-muted" style="margin-top:4px">Renewal pending</div>' : ''}</td>
+                <td>${chip(m.state, MEMBER_STATE[m.state])}${m.has_pending_renewal ? '<div class="admin-muted" style="margin-top:4px">Renewal to verify</div>' : ''}</td>
               </tr>`).join('')}</tbody>
           </table></div>` : '<p class="admin-empty">No members here yet.</p>';
       } catch (err) {
@@ -414,8 +425,9 @@
       if (tr && e.key === 'Enter') memberDetail(Number(tr.dataset.id), reload);
     });
 
+    // The list as currently filtered, as an Excel file (named by the server).
     card.querySelector('[data-export]').onclick = () =>
-      A.downloadPrivateFile(`${BASE}/members/export.csv${query({ state: filters.state, category: filters.category, q: filters.q })}`, `slicna-members-${today()}.csv`);
+      A.downloadPrivateFile(`${BASE}/members/export.xlsx${query({ state: filters.state, category: filters.category, q: filters.q })}`);
 
     card.querySelector('[data-add]').onclick = async () => {
       const hint = await suggestionsHint();
@@ -458,12 +470,12 @@
         <div>
           <div class="detail-section"><h3>Membership</h3>${dl([
             ['Number', m.membership_number], ['Category', `${CATEGORIES[m.category]} (${m.category})`],
-            ['Status', html(chip(m.state, MEMBER_STATE[m.state]) + (m.has_pending_renewal ? ' <span class="admin-muted">Renewal pending</span>' : ''))],
+            ['Status', html(chip(m.state, MEMBER_STATE[m.state]) + (m.has_pending_renewal ? ' <span class="admin-muted">Renewal to verify</span>' : ''))],
             ['Member since', fmtDate(m.joined_on)], ['Valid until', m.valid_until ? fmtDate(m.valid_until) : 'Lifetime'],
             ['Grace period ends', m.grace_ends ? fmtDate(m.grace_ends) : ''],
             ['Deactivated', m.deactivated_at ? `${fmtDate(m.deactivated_at)}: ${m.deactivated_reason}` : ''],
             ['Joined through', m.source === 'manual' ? 'Added by an admin' : m.application ? `Application ${m.application.reference_number}` : 'Application'],
-            ['ID application', m.id_application_created_at ? `Created ${fmtDate(m.id_application_created_at)}` : 'Not yet created'],
+            ['Previous number', (m.previous_numbers || []).map((p) => `${p.membership_number} (until ${fmtDate(p.retired_at)}, upgraded to Lifetime; reserved)`).join(', ')],
           ])}</div>
           <div class="detail-section"><h3>Details</h3>${dl([
             ['Name', `${m.title || ''} ${m.full_name}`], ['NIC', m.nic_number], ['Date of birth', fmtDate(m.date_of_birth)], ['Sex', m.sex],
@@ -484,8 +496,6 @@
             <button type="button" class="btn btn-light btn-sm" data-act="edit">Edit details</button>
             ${!isLt && m.state !== 'deactivated' ? '<button type="button" class="btn btn-light btn-sm" data-act="link">Renewal link…</button>' : ''}
             ${!isLt && m.state !== 'deactivated' ? '<button type="button" class="btn btn-teal btn-sm" data-act="payment">Record a payment…</button>' : ''}
-            <button type="button" class="btn btn-light btn-sm" data-act="pdf">ID card application (PDF)</button>
-            ${m.id_application_created_at ? '' : '<button type="button" class="btn btn-light btn-sm" data-act="id-done">Mark ID application created</button>'}
             ${m.state === 'deactivated'
               ? '<button type="button" class="btn btn-teal btn-sm" data-act="reactivate">Reactivate</button>'
               : '<button type="button" class="btn btn-danger btn-sm" data-act="deactivate">Deactivate…</button>'}
@@ -538,14 +548,6 @@
           submit: (fd) => api('POST', `${BASE}/members/${m.id}/payments`, fd),
         });
         if (ok) refresh('Payment recorded.');
-      } else if (act === 'pdf') {
-        A.openPrivateFile(`${BASE}/members/${m.id}/id-application.pdf`);
-      } else if (act === 'id-done') {
-        if (!(await confirmDialog({ title: 'Mark ID application created?', message: `Records that the ID card application for ${m.membership_number} has been created.`, confirmText: 'Mark created' }))) return;
-        try {
-          await api('POST', `${BASE}/members/${m.id}/id-application`);
-          refresh('Marked as created.');
-        } catch (err) { toast(err.message, true); }
       } else if (act === 'deactivate') {
         const ok = await openForm({
           title: 'Deactivate member',
@@ -569,7 +571,7 @@
   function renewalLinkDialog(m) {
     const view = infoDialog({ title: 'Renewal link', wide: false });
     view.body.innerHTML = `
-      <p>A personal link that opens ${esc(m.name_with_initials)}'s renewal page with their details filled in. It works for 90 days, and they confirm with the last 4 digits of their NIC.</p>
+      <p>A personal link that opens ${esc(m.name_with_initials)}'s renewal page with their details filled in. It works for 90 days, and they confirm with their NIC number.</p>
       <div class="action-bar" style="border-top:0;margin-top:0;padding-top:0">
         <button type="button" class="btn btn-light btn-sm" data-act="create">Create link to copy</button>
         ${m.email ? `<button type="button" class="btn btn-teal btn-sm" data-act="email">Email link to ${esc(m.email)}</button>` : '<span class="admin-muted">No email address on record.</span>'}
@@ -605,19 +607,27 @@
     const card = document.createElement('section');
     card.className = 'admin-card';
     main.appendChild(card);
-    card.innerHTML = '<div class="admin-card-head"><div><h2>Renewals &amp; upgrades</h2><p>Check each payment slip against the bank statement (the member quoted the payment reference), then verify or reject it.</p></div></div><div data-filters></div><div data-list></div>';
+    card.innerHTML = '<div class="admin-card-head"><div><h2>Renewals &amp; upgrades</h2><p>Check each payment slip, then verify or reject it.</p></div></div><div data-filters></div><div data-list></div>';
     const listEl = card.querySelector('[data-list]');
     const filters = filterBar(card.querySelector('[data-filters]'), {
       chipKey: 'status', search: false,
-      chips: [['pending', 'To verify'], ['verified', 'Verified'], ['rejected', 'Rejected'], ['all', 'All']],
+      chips: [['pending', 'To Verify'], ['verified', 'Verified'], ['rejected', 'Rejected'], ['all', 'All']],
       onChange: load,
     });
     let rows = [];
+
+    async function updateCounts() {
+      try {
+        const counts = await api('GET', `${BASE}/renewals/counts`);
+        card.querySelectorAll('[data-chip]').forEach((c) => { c.textContent = `${c.dataset.label} (${counts[c.dataset.chip] || 0})`; });
+      } catch (err) { /* keep the plain labels */ }
+    }
 
     async function load() {
       listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
       try {
         rows = await api('GET', `${BASE}/renewals${query({ status: filters.status })}`);
+        updateCounts();
         listEl.innerHTML = rows.length ? `
           <div class="admin-table-wrap"><table class="admin-table">
             <thead><tr><th>Submitted</th><th>Member</th><th>Type</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead>
@@ -652,6 +662,7 @@
           <div class="detail-section"><h3>Payment</h3>${dl([
             ['Member', `${r.membership_number} · ${r.name_with_initials}`],
             ['Type', r.kind === 'upgrade' ? `Upgrade ${r.from_category} → Lifetime` : `Renewal of ${CATEGORIES[r.from_category]}`],
+            ['Previous number', r.previous_membership_number ? `${r.previous_membership_number} (reserved, not reused)` : ''],
             ['Amount due', money(r.amount)], ['Payment reference', r.payment_reference], ['Paid on', fmtDate(r.payment_date)],
             ['Submitted', fmtDateTime(r.created_at)],
             ['Valid until (before)', r.previous_valid_until ? fmtDate(r.previous_valid_until) : ''],
@@ -659,6 +670,9 @@
             ['Status', html(chip(r.status, { pending: 'To verify', verified: 'Verified', rejected: 'Rejected' }[r.status]))],
             ['Message to member', r.status_note],
           ])}</div>
+          ${r.kind === 'upgrade' && r.icu_training_type ? `<div class="detail-section"><h3>Lifetime requirement</h3>${dl([
+            ['ICU training (PBCN)', `${r.icu_training_type === 'diploma' ? 'Diploma' : 'Certificate'}, batch ${r.icu_training_batch}, ${r.icu_training_year}`],
+          ])}<p class="admin-muted">Check this before verifying the upgrade.</p></div>` : ''}
           ${changes.length ? `<div class="detail-section"><h3>Contact details to update</h3>${dl(changes)}<p class="admin-muted">Applied to the member record when verified.</p></div>` : ''}
         </div>
         <div>
@@ -691,13 +705,13 @@
             hidden: { status: 'verified' },
             saveLabel: 'Verify and upgrade',
             confirmTitle: 'Verify this payment and upgrade?',
-            confirmMessage: `Confirm you've matched ${money(r.amount)} (ref ${r.payment_reference}) on the bank statement. ${r.name_with_initials} becomes a Lifetime member and is emailed.`,
+            confirmMessage: `Confirm you've checked the payment slip for ${money(r.amount)} (${r.payment_reference}). ${r.name_with_initials} becomes a Lifetime member and is emailed.`,
             submit: (fd) => api('PATCH', `${BASE}/renewals/${r.id}`, fd),
           });
           if (ok) done('Upgrade verified.');
           return;
         }
-        if (!(await confirmDialog({ title: 'Verify this payment?', message: `Confirm you've matched ${money(r.amount)} (ref ${r.payment_reference}) on the bank statement.\n\n${r.membership_number} will be extended by 12 months and the member will be emailed.`, confirmText: 'Verify payment' }))) return;
+        if (!(await confirmDialog({ title: 'Verify this payment?', message: `Confirm you've checked the payment slip for ${money(r.amount)} (${r.payment_reference}).\n\n${r.membership_number} will be extended by 12 months and the member will be emailed.`, confirmText: 'Verify payment' }))) return;
         try {
           const fd = new FormData();
           fd.append('status', 'verified');
@@ -743,12 +757,17 @@
             <td><div class="row-actions"><button type="button" class="btn btn-light btn-sm" data-fee="${esc(f.category)}">Edit</button></div></td></tr>`).join('')}</tbody>
         </table></div>
 
-        <div class="admin-card-head" style="margin-top:28px"><div><h2>Bank details &amp; renewals</h2></div>
-          <button type="button" class="btn btn-light btn-sm" data-edit-settings>Edit</button></div>
-        ${dl([
-          ['Bank', s.bank.bank_name], ['Account number', s.bank.account_number], ['Branch', s.bank.branch], ['Account name', s.bank.account_name],
-          ['First reminder', `${s.notice_days} days before expiry`], ['Grace period', `${s.grace_days} days after expiry`],
-        ])}
+        <div class="settings-section">
+          <div class="admin-card-head"><div><h2>Bank details</h2><p>Shown wherever people pay: membership, renewals and paid events.</p></div>
+            <button type="button" class="btn btn-light btn-sm" data-edit-bank>Edit</button></div>
+          ${dl([['Bank', s.bank.bank_name], ['Account number', s.bank.account_number], ['Branch', s.bank.branch], ['Account name', s.bank.account_name]])}
+        </div>
+
+        <div class="settings-section">
+          <div class="admin-card-head"><div><h2>Renewals</h2><p>When annual memberships are due and how long members can still renew after expiry.</p></div>
+            <button type="button" class="btn btn-light btn-sm" data-edit-renewals>Edit</button></div>
+          ${dl([['First reminder', `${s.notice_days} days before expiry`], ['Grace period', `${s.grace_days} days after expiry`]])}
+        </div>
 
         <div class="admin-card-head" style="margin-top:28px"><div><h2>Renewal reminder emails</h2>
           <p>A daily scheduled job sends reminders (${s.notice_days} and 7 days before expiry, on expiry, 14 days before the grace period ends, and when a membership lapses). You can also run it now.</p></div>
@@ -772,27 +791,38 @@
         };
       });
 
-      card.querySelector('[data-edit-settings]').onclick = async () => {
+      card.querySelector('[data-edit-bank]').onclick = async () => {
         const ok = await openForm({
-          title: 'Bank details & renewals',
+          title: 'Bank details',
           fields: [
             { name: 'bank_name', label: 'Bank', required: true, half: true },
             { name: 'bank_branch', label: 'Branch', required: true, half: true },
             { name: 'bank_account_number', label: 'Account number', required: true, half: true },
             { name: 'bank_account_name', label: 'Account name', required: true, half: true },
-            { name: 'membership_notice_days', label: 'First reminder (days before expiry)', type: 'number', min: 7, required: true, half: true },
-            { name: 'membership_grace_days', label: 'Grace period (days after expiry)', type: 'number', min: 0, required: true, half: true },
           ],
-          values: {
-            bank_name: s.bank.bank_name, bank_branch: s.bank.branch, bank_account_number: s.bank.account_number, bank_account_name: s.bank.account_name,
-            membership_notice_days: s.notice_days, membership_grace_days: s.grace_days,
-          },
-          saveLabel: 'Save settings',
-          confirmTitle: 'Save these settings?',
-          confirmMessage: 'Bank details change on the website straight away. Reminder and grace period changes apply from the next daily run.',
+          values: { bank_name: s.bank.bank_name, bank_branch: s.bank.branch, bank_account_number: s.bank.account_number, bank_account_name: s.bank.account_name },
+          saveLabel: 'Save bank details',
+          confirmTitle: 'Save these bank details?',
+          confirmMessage: 'The new details show on the membership, renewal and event pages straight away.',
           submit: (fd) => api('PUT', `${BASE}/settings`, fd),
         });
-        if (ok) { toast('Settings saved.'); load(); }
+        if (ok) { toast('Bank details saved.'); load(); }
+      };
+
+      card.querySelector('[data-edit-renewals]').onclick = async () => {
+        const ok = await openForm({
+          title: 'Renewal settings',
+          fields: [
+            { name: 'membership_notice_days', label: 'First reminder (days before expiry)', type: 'number', min: 7, required: true, half: true, hint: 'Also when a member shows as "Renewal Due". 7 to 90 days.' },
+            { name: 'membership_grace_days', label: 'Grace period (days after expiry)', type: 'number', min: 0, required: true, half: true, hint: 'How long they can still renew before they lapse.' },
+          ],
+          values: { membership_notice_days: s.notice_days, membership_grace_days: s.grace_days },
+          saveLabel: 'Save renewal settings',
+          confirmTitle: 'Save these renewal settings?',
+          confirmMessage: 'Member statuses use the new values straight away; reminders follow them from the next daily run.',
+          submit: (fd) => api('PUT', `${BASE}/settings`, fd),
+        });
+        if (ok) { toast('Renewal settings saved.'); load(); }
       };
 
       card.querySelector('[data-run]').onclick = async () => {
@@ -818,7 +848,7 @@
 
   A.registerSection('applications', {
     label: 'Applications', sub: 'Review new members', render: renderApplications,
-    intro: 'Review online applications: check the details, photo, payment slip and recommendation, then approve, ask for more information or reject.',
+    intro: 'Review online applications: check the details, photo and payment slip, then approve, ask for more information or reject.',
   });
   A.registerSection('members', {
     label: 'Members', sub: 'Directory and renewals', render: renderMembers,
@@ -829,7 +859,7 @@
     intro: 'Renewal and upgrade payments submitted by members through their renewal link.',
   });
   A.registerSection('membership-settings', {
-    label: 'Membership settings', sub: 'Fees, bank, reminders', render: renderSettings,
+    label: 'Membership Settings', sub: 'Fees, bank, reminders', render: renderSettings,
     intro: 'Settings for membership fees, payment details and renewal reminders.',
   });
 })();

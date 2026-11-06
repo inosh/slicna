@@ -70,10 +70,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             <span class="choice-meta">Pay once, never renew. Requires a PBCN ICU qualification or 10+ years in ICU.</span></span></label>
         </div>
 
+        <div class="upgrade-req" id="upgrade-req" hidden>
+          <h3 style="font-size:20px;margin:0 0 4px">Lifetime requirement</h3>
+          <p class="muted" style="margin:0 0 14px">Your Post Basic College of Nursing (PBCN) ICU training, as on the Lifetime application form.</p>
+          <div class="form-grid">
+            <div class="field"><label for="r-icu-batch">ICU training batch (PBCN)</label><input id="r-icu-batch" name="icu_training_batch" maxlength="50"></div>
+            <div class="field"><label for="r-icu-type">Diploma or certificate</label>
+              <select id="r-icu-type" name="icu_training_type"><option value="">Select</option><option value="diploma">Diploma</option><option value="certificate">Certificate</option></select></div>
+            <div class="field"><label for="r-icu-year">Year</label><input id="r-icu-year" name="icu_training_year" type="number" min="1950" max="2100" inputmode="numeric"></div>
+          </div>
+        </div>
+
         <h3 style="font-size:20px;margin-top:26px">1. Pay the fee</h3>
         <p><span class="amount-due" id="amount-due">${esc(MS.money(v.renewal.amount))}</span></p>
-        <p class="muted">Please quote the payment reference in the transfer remarks or on the deposit slip.</p>
-        ${MS.bankBox(v.bank, v.payment_reference)}
+        <p class="muted">Pay by bank transfer or deposit, then upload the slip or a screenshot below.</p>
+        ${MS.bankBox(v.bank)}
 
         <h3 style="font-size:20px;margin-top:26px">2. Check your contact details</h3>
         <div class="form-grid">
@@ -85,7 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <h3 style="font-size:20px;margin-top:26px">3. Upload your payment slip</h3>
         <div class="form-grid">
           <div class="field"><label for="r-date">Date you paid</label><input id="r-date" name="payment_date" type="date" required></div>
-          <div class="field"><label for="r-nic">Last 4 digits of your NIC</label><input id="r-nic" name="nic_last4" required maxlength="4" inputmode="numeric" autocomplete="off"><p class="hint">To confirm it's you.</p></div>
+          <div class="field"><label for="r-nic">NIC number</label><input id="r-nic" name="nic_number" required maxlength="12" autocomplete="off"><p class="hint">To confirm it's you. Old or new format.</p></div>
           <div class="field full"><label for="r-receipt">Payment slip or screenshot</label>
             <div class="file-field"><div class="file-preview">No file</div><div><input type="file" id="r-receipt" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" required><p class="hint">JPG / PNG / PDF, up to 10MB.</p></div></div></div>
         </div>
@@ -96,22 +107,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const form = document.getElementById('renew-form');
     MS.bindFilePreview(form.receipt);
+    const upgradeReq = document.getElementById('upgrade-req');
+    const upgradeInputs = [form.icu_training_batch, form.icu_training_type, form.icu_training_year];
     form.addEventListener('change', (e) => {
       if (e.target.name === 'kind') {
-        document.getElementById('amount-due').textContent = MS.money(e.target.value === 'upgrade' ? v.upgrade.amount : v.renewal.amount);
+        const upgrading = e.target.value === 'upgrade';
+        document.getElementById('amount-due').textContent = MS.money(upgrading ? v.upgrade.amount : v.renewal.amount);
+        upgradeReq.hidden = !upgrading;
+        upgradeInputs.forEach((el) => { el.required = upgrading; });
       }
     });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      const FE = SLICNA_FORM_ERRORS;
       const status = document.getElementById('renew-status');
-      const fail = (msg) => { status.className = 'form-status is-error'; status.textContent = msg; };
+      status.className = 'form-status';
+      FE.clearAll(form);
+      // Each problem is shown under its field, which gets focus.
+      const fail = (input, msg) => {
+        FE.setFieldError(input, msg);
+        FE.focusOn(input);
+      };
+      if (form.kind.value === 'upgrade') {
+        const empty = upgradeInputs.find((el) => !el.value.trim());
+        if (empty) return fail(empty, 'This is required for Lifetime Membership.');
+        const year = Number(form.icu_training_year.value);
+        if (!Number.isInteger(year) || year < 1950 || year > new Date().getFullYear()) return fail(form.icu_training_year, 'Please enter the year you completed the training.');
+      }
       form.mobile.value = form.mobile.value.replace(/[\s-]/g, '');
-      if (form.mobile.value && !/^(?:\+94|0)7[0-8][0-9]{7}$/.test(form.mobile.value)) return fail('Enter a mobile number like 07XXXXXXXX or +947XXXXXXXX.');
-      if (!form.payment_date.value) return fail('Please enter the date you paid.');
-      if (!/^\d{4}$/.test(form.nic_last4.value.trim())) return fail('Please enter the last 4 digits of your NIC.');
-      if (!form.receipt.files.length) return fail('Please upload your payment slip or screenshot.');
+      if (form.mobile.value && !/^(?:\+94|0)7[0-8][0-9]{7}$/.test(form.mobile.value)) return fail(form.mobile, 'Enter a mobile number like 07XXXXXXXX or +947XXXXXXXX.');
+      if (!form.payment_date.value) return fail(form.payment_date, 'Please enter the date you paid.');
+      if (!/^(\d{9}[VvXx]|\d{12})$/.test(form.nic_number.value.replace(/\s/g, ''))) return fail(form.nic_number, 'Enter your NIC: 12 digits, or 9 digits followed by V or X.');
+      if (!form.receipt.files.length) return fail(form.receipt, 'Please upload your payment slip or screenshot.');
       const problem = MS.fileProblem(form.receipt, { pdf: true });
-      if (problem) return fail(problem);
+      if (problem) return fail(form.receipt, problem);
 
       const button = form.querySelector('[type="submit"]');
       button.disabled = true;
@@ -124,8 +153,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             <h2>Thank you</h2>
             <p class="muted" style="max-width:50ch;margin:0 auto 12px">We received your payment slip (reference <strong>${esc(result.payment_reference)}</strong>). We'll verify it and confirm by email, usually within a few working days.</p>
           </div>`;
+        FE.focusOn(host.querySelector('.success-panel'));
       } catch (err) {
-        fail(err.message);
+        FE.showError(form, status, err.message);
         button.disabled = false;
         button.textContent = 'Submit';
       }

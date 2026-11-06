@@ -63,7 +63,9 @@
         });
         sessionStorage.setItem('slicna_admin_token', data.token);
         sessionStorage.setItem('slicna_admin_user', JSON.stringify(data.user));
-        window.location.replace('/pages/admin.html');
+        const next = sessionStorage.getItem('slicna_admin_next') || '';
+        sessionStorage.removeItem('slicna_admin_next');
+        window.location.replace('/pages/admin.html' + (/^#[\w-]+$/.test(next) ? next : ''));
       } catch (err) {
         show('error', err.message);
         button.disabled = false;

@@ -45,6 +45,8 @@ const SLICNA_API = (() => {
     newsItem: (id) => request('/news/' + encodeURIComponent(id)),
     events: () => request('/events'),
     event: (id) => request('/events/' + encodeURIComponent(id)),
+    eventMemberCheck: (id, number, nic) => postJson('/events/' + encodeURIComponent(id) + '/member-check', { membership_number: number, nic_number: nic }),
+    registerForEvent: (id, formData) => request('/events/' + encodeURIComponent(id) + '/registrations', { method: 'POST', body: formData }),
     committee: () => request('/committee'),
     milestones: () => request('/milestones'),
     settings: () => request('/settings'),
