@@ -569,6 +569,80 @@ table.data tfoot .num { color: #fff; }
 .ref-box span { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
 .ref-box b { font-family: var(--font-display); font-size: 26px; color: var(--teal-ink); letter-spacing: .04em; }
 
+/* ---------- Journal (flipbook reader) ---------- */
+.journal-reader { background: var(--teal-ink); color: #fff; border-radius: var(--radius-l); padding: clamp(16px, 3vw, 28px); box-shadow: var(--shadow-2); }
+.journal-reader:fullscreen { border-radius: 0; display: flex; flex-direction: column; overflow: auto; }
+.reader-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 14px 24px; margin-bottom: 18px; }
+.reader-head h2 { color: #fff; font-size: clamp(22px, 3vw, 30px); margin: 4px 0 0; }
+.reader-issue { margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--mint); }
+.journal-reader .reader-desc { color: rgba(255, 255, 255, .72); margin: 6px 0 0; max-width: 70ch; }
+.reader-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.book-stage { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 320px;
+  padding: clamp(10px, 2vw, 22px) 0; border-radius: var(--radius); background: radial-gradient(ellipse at center, rgba(255, 255, 255, .09), transparent 70%); }
+.journal-reader:fullscreen .book-stage { flex: 1; }
+.book { flex: 1; max-width: 1100px; min-width: 0; }
+.book .stf__parent { margin: 0 auto; }
+/* StPageFlip HTML mode (layout rules from the library) and the page look */
+.stf__parent { position: relative; display: block; box-sizing: border-box; transform: translateZ(0); touch-action: pan-y; }
+.stf__wrapper { position: relative; width: 100%; box-sizing: border-box; }
+.stf__parent canvas { position: absolute; width: 100%; height: 100%; left: 0; top: 0; }
+.stf__block { position: absolute; width: 100%; height: 100%; box-sizing: border-box; perspective: 2000px; }
+.stf__item { display: none; position: absolute; transform-style: preserve-3d; }
+.stf__outerShadow, .stf__innerShadow, .stf__hardShadow, .stf__hardInnerShadow { position: absolute; left: 0; top: 0; }
+.journal-page { background: #fff; overflow: hidden; }
+.journal-page img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; }
+.book-nav { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .14); color: #fff; font-size: 30px; line-height: 1; cursor: pointer; transition: background .15s; }
+.book-nav:hover:not(:disabled) { background: var(--coral); }
+.book-nav:disabled { opacity: .3; cursor: default; }
+.book-nav:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+.book-loading { position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; justify-items: center; gap: 12px; text-align: center; padding: 20px; color: rgba(255, 255, 255, .85); }
+.book-loading[hidden] { display: none; }
+.book-loading a { color: #fff; font-weight: 700; }
+.book-loading p { margin: 0; }
+.book-loading-bar { width: min(280px, 70vw); height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+.book-loading-bar span { display: block; height: 100%; width: 0; background: var(--mint); transition: width .2s; }
+.reader-foot { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
+.reader-foot input[type="range"] { flex: 1; accent-color: var(--mint); }
+.book-counter { flex: none; min-width: 140px; text-align: right; font-weight: 700; font-size: 14px; }
+.journal-reader .reader-hint { color: rgba(255, 255, 255, .55); font-size: 13px; margin: 10px 0 0; }
+.journal-reader .btn-light { background: rgba(255, 255, 255, .12); color: #fff; border-color: transparent; }
+.journal-reader .btn-light:hover { background: rgba(255, 255, 255, .22); }
+@media (max-width: 640px) { .book-nav { width: 36px; height: 36px; font-size: 24px; } .book-stage { gap: 4px; } .book-counter { min-width: 0; } }
+.book .journal-page { cursor: zoom-in; }
+.zoom-view { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: #041817; color: #fff; }
+.zoom-view[hidden] { display: none; }
+.zoom-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 10px 16px; border-bottom: 1px solid rgba(255, 255, 255, .12); }
+.zoom-page { font-weight: 700; font-size: 14px; min-width: 110px; }
+.zoom-controls { display: flex; align-items: center; gap: 8px; }
+.zoom-btn { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .14); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+.zoom-btn:hover:not(:disabled) { background: var(--coral); }
+.zoom-btn:disabled { opacity: .3; cursor: default; }
+.zoom-btn:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+.zoom-level { min-width: 52px; text-align: center; font-weight: 700; font-size: 14px; }
+.zoom-view .btn-light { background: rgba(255, 255, 255, .12); color: #fff; border-color: transparent; }
+.zoom-scroll { flex: 1; overflow: auto; scrollbar-gutter: stable; padding: 16px 56px; cursor: grab; outline: none; }
+.zoom-scroll.dragging { cursor: grabbing; user-select: none; }
+.zoom-scroll canvas { display: block; margin: 0 auto; background: #fff; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
+.zoom-nav { position: absolute; top: 50%; }
+.zoom-prev { left: 10px; }
+.zoom-next { right: 10px; }
+@media (max-width: 640px) { .zoom-scroll { padding: 10px 8px 60px; } .zoom-nav { top: auto; bottom: 10px; } .zoom-page { min-width: 0; } }
+.issue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
+@media (max-width: 640px) { .issue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } .issue-cover-text b { font-size: 18px; } }
+.issue-card { display: flex; flex-direction: column; gap: 10px; padding: 0; border: 0; background: none; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+.issue-cover { display: block; aspect-ratio: 3 / 4; border-radius: 10px; overflow: hidden; background: var(--teal-deep); box-shadow: var(--shadow-1); transition: transform .2s, box-shadow .2s; }
+.issue-card:hover .issue-cover, .issue-card:focus-visible .issue-cover { transform: translateY(-4px); box-shadow: var(--shadow-2); }
+.issue-card[aria-current="true"] .issue-cover { outline: 3px solid var(--coral); outline-offset: 3px; }
+.issue-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.issue-cover-text { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; padding: 18px; color: #fff;
+  background: linear-gradient(160deg, var(--teal) 0%, var(--teal-ink) 75%); }
+.issue-cover-text small { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--mint); }
+.issue-cover-text b { font-family: var(--font-display); font-size: 22px; line-height: 1.15; margin-top: 6px; }
+.issue-meta b { display: block; font-size: 15px; line-height: 1.3; }
+.issue-meta span { display: block; font-size: 13.5px; color: var(--ink-3); margin-top: 2px; }
+.issue-now { display: none; font-style: normal; font-size: 12px; font-weight: 700; color: var(--coral-deep); margin-top: 4px; }
+.issue-card[aria-current="true"] .issue-now { display: block; }
+
 /* ---------- Detail facts ---------- */
 .facts { display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
 .facts div { display: flex; justify-content: space-between; gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 15px; }

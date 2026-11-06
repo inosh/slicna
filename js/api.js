@@ -42,6 +42,7 @@ const SLICNA_API = (() => {
     request,
     mediaUrl,
     news: () => request('/news'),
+    journals: () => request('/journals'),
     newsItem: (id) => request('/news/' + encodeURIComponent(id)),
     events: () => request('/events'),
     event: (id) => request('/events/' + encodeURIComponent(id)),
