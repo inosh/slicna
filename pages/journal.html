@@ -32,7 +32,6 @@
           <div>
             <p class="reader-issue" id="reader-issue"></p>
             <h2 id="reader-title"></h2>
-            <p class="muted reader-desc" id="reader-desc"></p>
           </div>
           <div class="reader-actions">
             <button type="button" class="btn btn-teal btn-sm" id="reader-zoom" disabled>Zoom in to read</button>
@@ -55,7 +54,6 @@
           <input type="range" id="book-slider" min="1" max="1" value="1" aria-label="Go to page" disabled>
           <span class="book-counter" id="book-counter" aria-live="polite"></span>
         </div>
-        <p class="muted reader-hint">Tip: use the arrow keys, swipe, or click a page corner to turn pages. Double-click a page or use "Zoom in to read" to enlarge it.</p>
 
         <!-- One page, large and sharp: zoom in and out, scroll or drag to move around. -->
         <div class="zoom-view" id="zoom-view" role="dialog" aria-modal="true" aria-label="Zoomed page" hidden>
@@ -76,6 +74,8 @@
           <button type="button" class="book-nav zoom-nav zoom-next" id="zoom-next" aria-label="Next page">&#8250;</button>
         </div>
       </div>
+      <p class="reader-desc" id="reader-desc" hidden></p>
+      <p class="muted reader-hint">Tip: use the arrow keys, swipe, or click a page corner to turn pages. Double-click a page or use "Zoom in to read" to enlarge it.</p>
 
       <p class="empty" id="journal-empty" hidden>The first issue of the SLICNA journal is on its way. Please check back soon.</p>
     </div>

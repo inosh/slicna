@@ -1,4 +1,4 @@
-// Application status lookup: reference number + NIC.
+// Application status lookup: reference number or NIC (either one).
 document.addEventListener('DOMContentLoaded', () => {
   const esc = SLICNA.escapeHtml;
   const form = document.getElementById('status-form');
@@ -64,19 +64,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const ref = form.reference.value.trim();
-    const nic = form.nic.value.trim();
+    const lookup = form.lookup.value.trim();
     errorEl.className = 'form-status';
     resultEl.innerHTML = '';
-    if (!ref || !nic) {
+    if (!lookup) {
       errorEl.className = 'form-status is-error';
-      errorEl.textContent = 'Please enter both your reference number and NIC.';
+      errorEl.textContent = 'Please enter your reference number or NIC.';
       return;
     }
     const button = form.querySelector('[type="submit"]');
     button.disabled = true;
     try {
-      render(await SLICNA_API.membershipStatus(ref, nic));
+      render(await SLICNA_API.membershipStatus(lookup));
     } catch (err) {
       errorEl.className = 'form-status is-error';
       errorEl.textContent = err.message;
@@ -86,8 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const ref = new URLSearchParams(location.search).get('ref');
+  // Opened from the application confirmation: the reference alone is enough, so check straight away.
   if (ref) {
-    form.reference.value = ref;
-    form.nic.focus();
+    form.lookup.value = ref;
+    form.requestSubmit();
   }
 });

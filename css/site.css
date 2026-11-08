@@ -35,6 +35,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
@@ -163,11 +164,13 @@ p { margin: 0 0 1em; }
 }
 
 /* ---------- Page heads (inner pages) ---------- */
-.page-head { padding: clamp(40px, 7vw, 84px) 0 clamp(28px, 5vw, 56px); position: relative; overflow: hidden; }
-.page-head h1 { font-size: clamp(36px, 6vw, 64px); max-width: 16ch; }
-.page-head .lede { font-size: clamp(17px, 2vw, 19.5px); color: var(--ink-2); max-width: 60ch; }
+/* Page headings: compact, so the content starts near the top; titles fit on one line where they can. */
+.page-head { padding: clamp(20px, 3vw, 36px) 0 clamp(18px, 2.5vw, 28px); position: relative; overflow: hidden; }
+.page-head h1 { font-size: clamp(30px, 4vw, 46px); line-height: 1.12; max-width: 42ch; margin-bottom: 10px; }
+.page-head .eyebrow { margin-bottom: 8px; }
+.page-head .lede { font-size: clamp(16px, 1.6vw, 18px); color: var(--ink-2); max-width: 70ch; margin: 0; }
 .page-head .ecg { position: absolute; right: -40px; bottom: 10px; width: min(560px, 60vw); height: 60px; opacity: .5; pointer-events: none; }
-.crumbs { font-size: 13.5px; color: var(--ink-3); margin-bottom: 18px; }
+.crumbs { font-size: 13.5px; color: var(--ink-3); margin-bottom: 10px; }
 .crumbs a { color: var(--ink-3); text-decoration: none; }
 .crumbs a:hover { color: var(--teal); }
 
@@ -264,6 +267,8 @@ p { margin: 0 0 1em; }
 .tag-teal { background: var(--mint); color: var(--teal-deep); }
 .tag-gold { background: #f6ecd6; color: #8a6418; }
 .tag-ink { background: #e6eaeb; color: var(--ink-2); }
+/* "CPD" label on CPD events in the lists: solid, so it reads first. */
+.tag-cpd { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .08em; background: var(--teal-ink); color: #fff; }
 .event-go { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; color: var(--teal); font-size: 18px; transition: background .2s, color .2s, border-color .2s; }
 .event-row:hover .event-go { background: var(--teal); color: #fff; border-color: var(--teal); }
 @media (max-width: 640px) {
@@ -328,6 +333,10 @@ a.bento-quote:hover { background: var(--coral-deep); }
 .news-card:hover .thumb img { transform: scale(1.04); }
 .news-card .body { padding: 18px 20px 22px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .news-card time { font-size: 13px; color: var(--ink-3); font-weight: 600; }
+/* News type tag (as on SLNA) beside the date. */
+.news-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0; }
+.news-type { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--mint); color: var(--teal-deep); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+#article-date .news-type { margin-right: 10px; vertical-align: 1px; }
 .news-card h3 { font-size: 20px; margin: 0; }
 .news-card p { font-size: 14.5px; color: var(--ink-2); margin: 0; }
 .news-card.is-lead { grid-column: 1 / -1; flex-direction: row; }
@@ -349,6 +358,10 @@ a.bento-quote:hover { background: var(--coral-deep); }
 .prose h3 { font-size: 23px; margin-top: 1.2em; }
 .prose ul { padding-left: 1.2em; }
 .prose li { margin-bottom: .4em; }
+.prose ol { padding-left: 1.4em; }
+.prose blockquote { margin: 1.4em 0; padding: 6px 0 6px 18px; border-left: 4px solid var(--coral); color: var(--ink-2); font-style: italic; }
+.prose img { display: block; max-width: 100%; height: auto; border-radius: 12px; margin: 1.2em 0; }
+.prose a { color: var(--teal); font-weight: 600; }
 .figure-round { border-radius: var(--radius-l); overflow: hidden; box-shadow: var(--shadow-2); }
 .figure-round img { width: 100%; height: 100%; object-fit: cover; }
 .figure-arch { border-radius: 240px 240px var(--radius-l) var(--radius-l); overflow: hidden; box-shadow: var(--shadow-2); aspect-ratio: 4 / 5; }
@@ -490,6 +503,13 @@ table.data tfoot .num { color: #fff; }
 .article-hero { border-radius: var(--radius-l); overflow: hidden; margin: 10px 0 34px; aspect-ratio: 16 / 9; background: var(--paper-2); }
 .article-hero img { width: 100%; height: 100%; object-fit: cover; }
 .article h1 { font-size: clamp(32px, 5vw, 52px); }
+/* News article: starts as close to the menu as other pages, with a title the
+   size of event titles (long headlines stay on two or three lines). */
+.news-detail-section { padding-top: clamp(20px, 3vw, 36px); }
+.news-detail-section .crumbs { margin-bottom: 10px; }
+/* Latest news starts level with the article (its type and date line), below the breadcrumb. */
+@media (min-width: 961px) { .news-detail-section .news-side { margin-top: 32px; } }
+.news-detail-section .article h1 { font-size: clamp(26px, 3vw, 38px); line-height: 1.18; margin-bottom: 14px; }
 .article .meta { color: var(--ink-3); font-size: 14.5px; margin-bottom: 8px; }
 
 /* ---------- Events: tags, toolbar, spotlight ---------- */
@@ -497,6 +517,7 @@ table.data tfoot .num { color: #fff; }
 .event-status { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .04em; background: #fdf3e2; color: #8a6418; }
 .event-status-open { background: var(--coral); color: #fff; }
 .event-status-closed, .event-status-past { background: #e6eaeb; color: var(--ink-2); }
+.event-status-ongoing, .status-ongoing { background: #e3edfb; color: #1f4f8f; }
 .events-toolbar { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
 .events-count { font-size: 14px; margin: 14px 0 0; min-height: 1em; }
 .event-list { margin-top: 14px; }
@@ -513,13 +534,75 @@ table.data tfoot .num { color: #fff; }
 @media (max-width: 760px) { .spotlight { grid-template-columns: 1fr; } .spotlight-media { max-width: 420px; } }
 
 /* ---------- Event page and registration ---------- */
-.event-title { max-width: 28ch; margin-top: 14px; }
-.event-detail { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: clamp(24px, 4vw, 56px); align-items: start; }
-.event-aside { position: sticky; top: 104px; display: grid; gap: 18px; }
-@media (max-width: 900px) { .event-detail { grid-template-columns: 1fr; } .event-aside { position: static; } }
-.event-main { display: grid; gap: 28px; min-width: 0; }
-.event-poster { border-radius: var(--radius-l); overflow: hidden; background: var(--paper-2); }
+/* Event titles can be long: smaller and wider than other page titles, so the details start near the top. */
+.page-head h1.event-title { max-width: 46ch; margin-top: 10px; font-size: clamp(28px, 3.2vw, 40px); line-height: 1.15; }
+.event-head { padding-top: clamp(20px, 3vw, 36px); } /* same as .page-head now */
+.event-head .lede { margin-top: 10px; font-size: 17px; }
+/* As on SLNA: details, fees and "About" on the left, the poster on the right.
+   Without a poster the details take one column. */
+.event-detail { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(24px, 4vw, 48px); align-items: start; }
+.event-detail:not(.has-poster) .event-info { max-width: 820px; }
+.event-detail.has-poster { grid-template-columns: minmax(0, 1fr) minmax(0, 560px); }
+.event-detail.poster-square { grid-template-columns: minmax(0, 1fr) minmax(0, 620px); }
+/* Landscape posters on phones and tablets: a banner above the details. */
+.event-detail.poster-landscape { grid-template-columns: minmax(0, 1fr); }
+.event-detail.poster-landscape .event-poster { position: static; order: -1; max-width: 980px; }
+.event-detail.poster-landscape .event-info { max-width: 820px; }
+/* Landscape posters on wider screens, as on SLNA: a narrow details card on the
+   left with one fact per line, the poster beside it, and payment, "About this
+   event" and the brochure across the full width below. */
+@media (min-width: 901px) {
+  .event-detail.poster-landscape { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); row-gap: 32px; }
+  .event-detail.poster-landscape .event-info { display: contents; }
+  .event-detail.poster-landscape .event-facts-card { grid-column: 1; grid-row: 1; }
+  .event-detail.poster-landscape .event-poster { grid-column: 2; grid-row: 1; order: 0; max-width: none; }
+  .event-detail.poster-landscape .event-info > :not(.event-facts-card) { grid-column: 1 / -1; }
+  .event-detail.poster-landscape .event-facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .event-detail.poster-landscape .event-facts > div { padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, .14); }
+  .event-detail.poster-landscape .event-facts > div:first-child { padding-top: 0; }
+  .event-detail.poster-landscape .event-facts-card .fee-list { grid-template-columns: minmax(0, 1fr); }
+  .event-detail.poster-landscape .event-facts-card .fee-list li:nth-child(odd) { border-right: 0; }
+  .event-detail.poster-landscape .event-facts-card .fee-list li { padding: 7px 0; }
+}
+.event-info { display: grid; gap: 24px; min-width: 0; }
+.event-poster { position: sticky; top: 104px; display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-l); overflow: hidden; background: var(--paper-2); cursor: zoom-in; box-shadow: var(--shadow-1); }
+/* The poster at its own shape: no letterbox. */
 .event-poster img { display: block; width: 100%; height: auto; }
+.event-poster:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
+@media (max-width: 900px) { .event-detail.has-poster { grid-template-columns: minmax(0, 1fr); } .event-poster { position: static; order: -1; max-width: 600px; } }
+
+/* The details card: dark, with the facts in columns (Date / Time / Location ...). */
+.event-card.event-facts-card { background: var(--teal-ink); color: #fff; border: 0; padding: 22px 24px; gap: 16px; }
+/* Two facts to a row; Location spans the row. */
+.event-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 22px; margin: 0; }
+.event-facts .wide { grid-column: 1 / -1; }
+.event-facts dt { font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--mint); opacity: .85; margin: 0 0 4px; }
+.event-facts dd { margin: 0; font-weight: 700; font-size: 15.5px; line-height: 1.4; }
+/* "Event fee" above the fee list: the same label style as the facts. */
+.event-card.event-facts-card h3 { font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--mint); opacity: .85; margin: 0 0 8px; }
+@media (max-width: 380px) { .event-facts { grid-template-columns: minmax(0, 1fr); } }
+.event-facts-card .fee-list { border-color: rgba(255, 255, 255, .18); }
+/* Fees in two columns inside the details card. */
+.event-facts-card .fee-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.event-facts-card .fee-list li { padding: 8px 12px; font-size: 14px; border-bottom: 1px solid rgba(255, 255, 255, .14); }
+.event-facts-card .fee-list li:nth-child(odd) { border-right: 1px solid rgba(255, 255, 255, .14); }
+@media (max-width: 480px) { .event-facts-card .fee-list { grid-template-columns: 1fr; } .event-facts-card .fee-list li:nth-child(odd) { border-right: 0; } }
+/* "How to pay": a folded card that opens to the bank details. */
+.event-bank summary { cursor: pointer; list-style: none; display: grid; gap: 2px; position: relative; padding-right: 28px; }
+.event-bank summary::-webkit-details-marker { display: none; }
+.event-bank summary::after { content: ""; position: absolute; right: 4px; top: 6px; width: 9px; height: 9px; border-right: 2px solid var(--teal); border-bottom: 2px solid var(--teal); transform: rotate(45deg); transition: transform .15s; }
+.event-bank[open] summary::after { transform: rotate(-135deg); top: 10px; }
+.event-bank summary h3 { margin: 0; }
+.event-bank summary .muted { font-size: 14px; }
+.event-facts-card .fee-list li { border-color: rgba(255, 255, 255, .14); }
+.event-facts-card .fee-list b, .event-facts-card .fee-free { color: #fff; }
+.event-facts-card .register-closed { background: rgba(255, 255, 255, .12); color: #fff; }
+.event-facts-card .register-note { color: rgba(255, 255, 255, .7); }
+/* Registration page: the form on the left, the event summary on the right. */
+.reg-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: clamp(24px, 4vw, 56px); align-items: start; }
+.event-aside { position: sticky; top: 104px; display: grid; gap: 18px; }
+.event-main { display: grid; gap: 28px; min-width: 0; }
+@media (max-width: 900px) { .reg-layout { grid-template-columns: 1fr; } .event-aside { position: static; } }
 .event-about-title { font-size: 26px; margin: 0 0 12px; }
 .attachment-link { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-decoration: none; color: var(--ink); max-width: 480px; }
 .attachment-link:hover { border-color: var(--teal); }
@@ -570,17 +653,30 @@ table.data tfoot .num { color: #fff; }
 .ref-box b { font-family: var(--font-display); font-size: 26px; color: var(--teal-ink); letter-spacing: .04em; }
 
 /* ---------- Journal (flipbook reader) ---------- */
-.journal-reader { background: var(--teal-ink); color: #fff; border-radius: var(--radius-l); padding: clamp(16px, 3vw, 28px); box-shadow: var(--shadow-2); }
+.journal-reader { background: var(--teal-ink); color: #fff; border-radius: var(--radius-l); padding: clamp(12px, 2vw, 18px); box-shadow: var(--shadow-2); }
 .journal-reader:fullscreen { border-radius: 0; display: flex; flex-direction: column; overflow: auto; }
-.reader-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 14px 24px; margin-bottom: 18px; }
-.reader-head h2 { color: #fff; font-size: clamp(22px, 3vw, 30px); margin: 4px 0 0; }
-.reader-issue { margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--mint); }
-.journal-reader .reader-desc { color: rgba(255, 255, 255, .72); margin: 6px 0 0; max-width: 70ch; }
-.reader-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.book-stage { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 320px;
-  padding: clamp(10px, 2vw, 22px) 0; border-radius: var(--radius); background: radial-gradient(ellipse at center, rgba(255, 255, 255, .09), transparent 70%); }
-.journal-reader:fullscreen .book-stage { flex: 1; }
-.book { flex: 1; max-width: 1100px; min-width: 0; }
+/* One slim row on top (date, title, buttons) so the pages start high up. */
+.reader-head { display: flex; justify-content: space-between; align-items: center; gap: 10px 20px; margin-bottom: 8px; }
+.reader-head > div:first-child { display: flex; align-items: baseline; gap: 14px; min-width: 0; flex: 1; }
+.reader-head h2 { color: #fff; font-size: 21px; line-height: 1.25; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reader-issue { flex: none; margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--mint); }
+.reader-actions .btn { padding: 5px 12px; font-size: 12.5px; line-height: 1.3; border-width: 1px; }
+/* The description sits under the reader, with the tip. */
+.reader-desc { margin: 12px 0 0; max-width: 70ch; }
+@media (max-width: 760px) {
+  .reader-head { flex-wrap: wrap; }
+  .reader-head > div:first-child { flex-basis: 100%; flex-wrap: wrap; gap: 2px 12px; }
+  .reader-head h2 { white-space: normal; }
+}
+.reader-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.book-stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 320px;
+  padding: 6px 0; border-radius: var(--radius); background: radial-gradient(ellipse at center, rgba(255, 255, 255, .09), transparent 70%); }
+.book { flex: 1; min-width: 0; }
+/* Full screen: the pages get nearly the whole screen. A slim top bar, no description or tip. */
+.journal-reader:fullscreen { padding: 10px 18px 12px; }
+.journal-reader:fullscreen .book-stage { flex: 1; min-height: 0; padding: 0; background: none; }
+.journal-reader:fullscreen .reader-head { margin-bottom: 8px; }
+.journal-reader:fullscreen .reader-foot { margin-top: 8px; }
 .book .stf__parent { margin: 0 auto; }
 /* StPageFlip HTML mode (layout rules from the library) and the page look */
 .stf__parent { position: relative; display: block; box-sizing: border-box; transform: translateZ(0); touch-action: pan-y; }
@@ -591,9 +687,11 @@ table.data tfoot .num { color: #fff; }
 .stf__outerShadow, .stf__innerShadow, .stf__hardShadow, .stf__hardInnerShadow { position: absolute; left: 0; top: 0; }
 .journal-page { background: #fff; overflow: hidden; }
 .journal-page img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; }
-.book-nav { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .14); color: #fff; font-size: 30px; line-height: 1; cursor: pointer; transition: background .15s; }
+.book-nav { position: absolute; top: 50%; z-index: 3; transform: translateY(-50%); width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(6, 43, 42, .72); color: #fff; font-size: 30px; line-height: 1; cursor: pointer; transition: background .15s; }
 .book-nav:hover:not(:disabled) { background: var(--coral); }
 .book-nav:disabled { opacity: .3; cursor: default; }
+.book-prev { left: 8px; }
+.book-next { right: 8px; }
 .book-nav:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
 .book-loading { position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; justify-items: center; gap: 12px; text-align: center; padding: 20px; color: rgba(255, 255, 255, .85); }
 .book-loading[hidden] { display: none; }
@@ -601,13 +699,15 @@ table.data tfoot .num { color: #fff; }
 .book-loading p { margin: 0; }
 .book-loading-bar { width: min(280px, 70vw); height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .15); overflow: hidden; }
 .book-loading-bar span { display: block; height: 100%; width: 0; background: var(--mint); transition: width .2s; }
-.reader-foot { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
+.reader-foot { display: flex; align-items: center; gap: 16px; margin-top: 10px; }
 .reader-foot input[type="range"] { flex: 1; accent-color: var(--mint); }
 .book-counter { flex: none; min-width: 140px; text-align: right; font-weight: 700; font-size: 14px; }
-.journal-reader .reader-hint { color: rgba(255, 255, 255, .55); font-size: 13px; margin: 10px 0 0; }
+/* The tip sits under the reader, so it takes no height from the pages. */
+.reader-hint { font-size: 13px; margin: 10px 0 0; }
+.journal-reader[hidden] ~ .reader-hint { display: none; }
 .journal-reader .btn-light { background: rgba(255, 255, 255, .12); color: #fff; border-color: transparent; }
 .journal-reader .btn-light:hover { background: rgba(255, 255, 255, .22); }
-@media (max-width: 640px) { .book-nav { width: 36px; height: 36px; font-size: 24px; } .book-stage { gap: 4px; } .book-counter { min-width: 0; } }
+@media (max-width: 640px) { .book-nav { width: 36px; height: 36px; font-size: 24px; } .book-prev { left: 2px; } .book-next { right: 2px; } .book-counter { min-width: 0; } }
 .book .journal-page { cursor: zoom-in; }
 .zoom-view { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: #041817; color: #fff; }
 .zoom-view[hidden] { display: none; }
@@ -623,10 +723,10 @@ table.data tfoot .num { color: #fff; }
 .zoom-scroll { flex: 1; overflow: auto; scrollbar-gutter: stable; padding: 16px 56px; cursor: grab; outline: none; }
 .zoom-scroll.dragging { cursor: grabbing; user-select: none; }
 .zoom-scroll canvas { display: block; margin: 0 auto; background: #fff; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
-.zoom-nav { position: absolute; top: 50%; }
+.zoom-nav { position: absolute; top: 50%; background: rgba(255, 255, 255, .14); }
 .zoom-prev { left: 10px; }
 .zoom-next { right: 10px; }
-@media (max-width: 640px) { .zoom-scroll { padding: 10px 8px 60px; } .zoom-nav { top: auto; bottom: 10px; } .zoom-page { min-width: 0; } }
+@media (max-width: 640px) { .zoom-scroll { padding: 10px 8px 60px; } .zoom-nav { top: auto; bottom: 10px; transform: none; } .zoom-page { min-width: 0; } }
 .issue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
 @media (max-width: 640px) { .issue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } .issue-cover-text b { font-size: 18px; } }
 .issue-card { display: flex; flex-direction: column; gap: 10px; padding: 0; border: 0; background: none; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
@@ -752,7 +852,9 @@ table.data tfoot .num { color: #fff; }
 .form-grid[hidden], .toggle-block[hidden] { display: none; }
 
 .choice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-@media (max-width: 640px) { .choice-grid { grid-template-columns: 1fr; } }
+/* An odd last option sits centred on its own row, at the same width as the others. */
+.choice-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; justify-self: center; width: calc(50% - 6px); }
+@media (max-width: 640px) { .choice-grid { grid-template-columns: 1fr; } .choice-grid > :last-child:nth-child(odd) { width: auto; justify-self: stretch; } }
 .choice { position: relative; display: block; cursor: pointer; }
 .choice input { position: absolute; opacity: 0; pointer-events: none; }
 .choice .choice-box { display: block; height: 100%; padding: 16px 18px; border: 1.5px solid var(--line); border-radius: var(--radius); background: var(--paper); transition: border-color .15s, background .15s; }
@@ -805,3 +907,108 @@ table.data tfoot .num { color: #fff; }
 .success-panel { text-align: center; padding: clamp(24px, 4vw, 44px); }
 .success-panel .tick { width: 64px; height: 64px; border-radius: 50%; background: var(--mint); color: var(--teal); display: grid; place-items: center; font-size: 30px; margin: 0 auto 16px; }
 .ref-code { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: clamp(22px, 4vw, 28px); padding: 10px 18px; border-radius: 14px; background: var(--mint-2); color: var(--teal-ink); }
+
+/* ---------- News article: sidebar, album grid ---------- */
+.news-detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 48px; align-items: start; }
+.news-detail-layout .article { max-width: 760px; margin: 0; }
+.news-side { position: sticky; top: 104px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.news-side h2 { font-size: 22px; margin: 0 0 12px; }
+.news-side-list { display: grid; gap: 4px; margin-bottom: 14px; }
+.news-side-item { display: flex; gap: 12px; align-items: center; padding: 8px; margin: 0 -8px; border-radius: 12px; text-decoration: none; color: var(--ink); }
+.news-side-item:hover { background: var(--mint-2); }
+.news-side-thumb { flex: none; width: 64px; height: 52px; border-radius: 10px; overflow: hidden; background: var(--mint); display: grid; place-items: center; font-family: var(--font-display); font-size: 22px; color: var(--teal); }
+.news-side-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.news-side-item b { display: block; font-size: 14px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.news-side-item time { display: block; font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+@media (max-width: 960px) { .news-detail-layout { grid-template-columns: minmax(0, 1fr); gap: 32px; } .news-side { position: static; } }
+
+/* Photos and videos under an article: 1 wide; 2-4 in a row; 5+ as 2 + 3 with "+N". */
+.news-album { margin-top: 34px; }
+.album-grid { display: grid; gap: 6px; border-radius: var(--radius); overflow: hidden; }
+.album-row { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 6px; }
+.album-tile { position: relative; padding: 0; border: 0; background: #111; cursor: zoom-in; aspect-ratio: 4 / 3; overflow: hidden; display: block; }
+.album-grid.count-1 .album-tile { aspect-ratio: 16 / 10; }
+.album-grid.count-5 .album-row:first-child .album-tile { aspect-ratio: 4 / 3; }
+.album-grid.count-5 .album-row:last-child .album-tile { aspect-ratio: 1; }
+.album-tile img, .album-tile video { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }
+.album-tile:hover img, .album-tile:hover video { transform: scale(1.03); }
+.album-tile:focus-visible { outline: 3px solid var(--coral); outline-offset: -3px; }
+.album-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(6, 20, 22, .55); color: #fff; font-family: var(--font-display); font-size: clamp(26px, 4vw, 40px); }
+.album-note { font-size: 14px; color: var(--ink-3); margin: 10px 0 0; }
+.media-play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 34px; text-shadow: 0 2px 10px rgba(0, 0, 0, .6); pointer-events: none; }
+.masonry figure.is-video video { width: 100%; display: block; aspect-ratio: 16 / 10; object-fit: cover; background: #111; }
+
+/* ---------- Photo/video viewer ---------- */
+.viewer { flex-direction: column; }
+.viewer-stage { margin: 0; display: flex; flex-direction: column; align-items: center; max-width: min(1200px, 100%); }
+.viewer-media img, .viewer-media video { display: block; max-width: 100%; max-height: 80vh; border-radius: 12px; background: #000; }
+.viewer-caption { color: #fff; text-align: center; margin-top: 12px; min-height: 1em; }
+.viewer-count { position: absolute; top: 26px; left: 24px; margin: 0; color: rgba(255, 255, 255, .8); font-weight: 700; font-size: 14px; }
+.viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .16); color: #fff; font-size: 30px; line-height: 1; cursor: pointer; }
+.viewer-nav:hover { background: var(--coral); }
+.viewer-prev { left: 16px; }
+.viewer-next { right: 16px; }
+@media (max-width: 640px) { .viewer { padding: 60px 8px 24px; } .viewer-nav { top: auto; bottom: 14px; transform: none; } }
+
+/* ---------- News ticker ---------- */
+.news-ticker { display: flex; align-items: center; max-width: var(--wrap); margin: 14px auto 0; background: var(--teal-ink); color: #fff; border-radius: 999px; overflow: hidden; }
+.news-ticker-label { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: var(--coral); font-size: 12.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: live-pulse 1.4s ease-in-out infinite; }
+@keyframes live-pulse { 50% { opacity: .35; } }
+.news-ticker-track { flex: 1; min-width: 0; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
+.news-ticker-content { display: flex; width: max-content; animation: ticker-scroll var(--ticker-time, 40s) linear infinite; }
+.news-ticker-content > span { display: flex; align-items: center; }
+.news-ticker:hover .news-ticker-content, .news-ticker:focus-within .news-ticker-content { animation-play-state: paused; }
+.news-ticker a { color: #fff; text-decoration: none; font-weight: 600; font-size: 14.5px; padding: 10px 0; white-space: nowrap; }
+.news-ticker a:hover { text-decoration: underline; }
+.news-ticker time { color: var(--mint); font-weight: 700; font-size: 12.5px; margin-right: 6px; }
+.news-ticker-sep { margin: 0 18px; color: var(--coral); }
+@keyframes ticker-scroll { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .news-ticker-content { animation: none; } .news-ticker-track { overflow-x: auto; } }
+@media (max-width: 1240px) { .news-ticker { margin-left: var(--gutter); margin-right: var(--gutter); } }
+@media (max-width: 640px) { .news-ticker-label { padding: 10px 12px; font-size: 11px; gap: 6px; } .news-ticker a { font-size: 13.5px; } }
+
+/* ---------- Gallery views: All / Albums (as on SLNA) ---------- */
+.gallery-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 20px; margin-bottom: 22px; }
+.gallery-count { margin: 0; font-size: 14px; }
+.album-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+.album-card { display: flex; flex-direction: column; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; transition: transform .2s ease, box-shadow .2s ease; }
+.album-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+.album-card-cover { position: relative; aspect-ratio: 4 / 3; background: var(--paper-2); display: grid; place-items: center; overflow: hidden; }
+.album-card-cover img, .album-card-cover video { width: 100%; height: 100%; object-fit: cover; }
+.album-card-empty { color: var(--ink-3); font-size: 14px; }
+.album-card-count { position: absolute; right: 10px; bottom: 10px; padding: 3px 10px; border-radius: 999px; background: rgba(6, 43, 42, .78); color: #fff; font-size: 12px; font-weight: 700; }
+.album-card-body { display: grid; gap: 4px; padding: 14px 16px 16px; }
+.album-card-body b { font-size: 16.5px; line-height: 1.35; }
+.album-card-body time { font-size: 13px; color: var(--ink-3); font-weight: 600; }
+.album-head { margin-bottom: 18px; }
+.album-head h2 { font-size: clamp(24px, 3vw, 32px); margin: 8px 0 4px; }
+.album-head .muted { margin: 0; }
+.link-back { font-weight: 700; color: var(--teal); text-decoration: none; }
+.link-back:hover { text-decoration: underline; }
+/* Events page list: menu links land here, below the sticky menu. */
+#all-events { scroll-margin-top: 96px; }
+
+/* Viewer zoom: + / − and close at the top right; a zoomed photo fills the
+   screen and scrolls (drag or swipe to move around). */
+.viewer-tools { position: absolute; top: 16px; right: 16px; z-index: 3; display: flex; align-items: center; gap: 10px; }
+.viewer-tools .lightbox-close { position: static; }
+.viewer-zoom { display: inline-flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; background: rgba(255, 255, 255, .14); }
+.viewer-zoom button { width: 38px; height: 38px; border: 0; border-radius: 50%; background: transparent; color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+.viewer-zoom button:hover:not(:disabled) { background: rgba(255, 255, 255, .18); }
+.viewer-zoom button:disabled { opacity: .35; cursor: default; }
+.viewer-zoom-level { min-width: 48px; text-align: center; color: #fff; font-weight: 700; font-size: 13.5px; }
+.viewer-media img { cursor: zoom-in; user-select: none; }
+.viewer.is-zoomed .viewer-media { position: fixed; inset: 0; z-index: 2; overflow: auto; display: grid; padding: 70px 20px 20px; cursor: grab; }
+.viewer.is-zoomed .viewer-media:active { cursor: grabbing; }
+.viewer.is-zoomed .viewer-media img { max-width: none; max-height: none; margin: auto; border-radius: 0; cursor: zoom-out; }
+.viewer.is-zoomed .viewer-nav, .viewer.is-zoomed .viewer-caption { display: none; }
+/* Registration: foreign participants choose online or physical. */
+.foreign-attend { margin-top: 18px; }
+.foreign-attend .field-label { display: block; margin-bottom: 8px; }
+/* News covers can be videos: the first frame with a play mark on cards and lists, a player on the article. */
+.news-card .thumb, .news-side-thumb { position: relative; }
+.news-card .thumb video, .news-side-thumb video { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.news-side-thumb .media-play { font-size: 16px; }
+.article-hero.is-video { background: #000; }
+.article-hero video { display: block; width: 100%; height: 100%; object-fit: contain; }

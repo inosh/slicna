@@ -55,8 +55,8 @@ const SLICNA_API = (() => {
     albums: () => request('/albums'),
     membershipInfo: () => request('/membership/info'),
     applyMembership: (formData) => request('/membership/applications', { method: 'POST', body: formData }),
-    membershipStatus: (reference, nic) => postJson('/membership/status', { reference_number: reference, nic_number: nic }),
-    renewalLookup: (number, nic) => postJson('/membership/renew/lookup', { membership_number: number, nic_number: nic }),
+    membershipStatus: (lookup) => postJson('/membership/status', { lookup }),
+    renewalLookup: (number) => postJson('/membership/renew/lookup', { membership_number: number }),
     renewalView: (token) => request('/membership/renew/' + encodeURIComponent(token)),
     submitRenewal: (token, formData) => request('/membership/renew/' + encodeURIComponent(token), { method: 'POST', body: formData }),
     sendContact: notYetOpen

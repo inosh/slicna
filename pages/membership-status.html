@@ -21,7 +21,7 @@
       <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / <a href="/pages/membership.html">Membership</a> / Application status</nav>
       <p class="eyebrow">Membership</p>
       <h1>Check your application</h1>
-      <p class="lede">Enter the reference number you received when you applied, and your NIC number.</p>
+      <p class="lede">Enter the reference number you received when you applied, or your NIC number.</p>
     </div>
   </section>
 
@@ -29,8 +29,7 @@
     <div class="wrap" style="max-width:760px">
       <form class="form-card" id="status-form" novalidate>
         <div class="form-grid">
-          <div class="field"><label for="ref">Reference number</label><input id="ref" name="reference" required placeholder="e.g. GM-20261106-7KQ2M9" autocomplete="off"></div>
-          <div class="field"><label for="nic">NIC number</label><input id="nic" name="nic" required maxlength="12"></div>
+          <div class="field full"><label for="lookup">Reference number or NIC</label><input id="lookup" name="lookup" required placeholder="e.g. GM-20261106-7KQ2M9 or 199012345678" autocomplete="off" maxlength="40"><p class="hint">Either one is enough.</p></div>
           <div class="full"><button class="btn btn-coral" type="submit">Check status</button></div>
         </div>
         <div class="form-status" id="status-error" role="status"></div>

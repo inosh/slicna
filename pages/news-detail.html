@@ -16,15 +16,24 @@
 <div id="site-header"></div>
 
 <main id="main">
-  <section class="section-tight">
-    <article class="wrap article">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / <a href="/pages/news.html">News</a></nav>
-      <p class="meta" id="article-date"></p>
-      <h1 id="article-title">Loading…</h1>
-      <div class="article-hero" id="article-photo" hidden></div>
-      <div class="prose" id="article-body"></div>
-      <p style="margin-top:40px"><a href="/pages/news.html" class="link-arrow">Back to all news</a></p>
-    </article>
+  <section class="section-tight news-detail-section">
+    <div class="wrap news-detail-layout">
+      <article class="article">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / <a href="/pages/news.html">News</a></nav>
+        <p class="meta" id="article-date"></p>
+        <h1 id="article-title">Loading…</h1>
+        <div class="article-hero" id="article-photo" hidden></div>
+        <div class="prose" id="article-body"></div>
+        <!-- The article's photos and videos (its album), as on the SLNA site. -->
+        <section class="news-album" id="article-album" hidden aria-label="Photos and videos"></section>
+        <p style="margin-top:40px"><a href="/pages/news.html" class="link-arrow">Back to all news</a></p>
+      </article>
+      <aside class="news-side" aria-labelledby="latest-title">
+        <h2 id="latest-title">Latest news</h2>
+        <div class="news-side-list" id="latest-news"></div>
+        <a href="/pages/news.html" class="link-arrow">All news</a>
+      </aside>
+    </div>
   </section>
 </main>
 
@@ -33,9 +42,52 @@
 <script src="/js/config.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/main.js"></script>
+<script src="/js/vendor/purify.min.js"></script>
+<script src="/js/media-viewer.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
+    const esc = SLICNA.escapeHtml;
     const id = new URLSearchParams(location.search).get('id');
+
+    // Photos and videos: one item full width; 2-4 in a row; 5 or more as two
+    // large and three small tiles, the last showing "+N" for the rest (as on SLNA).
+    // Any tile opens the viewer on the whole album.
+    function albumHtml(item) {
+      const media = item.photos.map((p) => ({ src: SLICNA.media(p.url), type: p.media_type || 'image', caption: p.caption || '' }));
+      const tile = (i, more = 0) => {
+        const m = media[i];
+        const inner = m.type === 'video'
+          ? `<video src="${m.src}" muted preload="metadata"></video><span class="media-play" aria-hidden="true">&#9658;</span>`
+          : `<img src="${m.src}" alt="${esc(m.caption)}" loading="lazy">`;
+        return `<button type="button" class="album-tile" data-i="${i}" aria-label="Open ${m.type === 'video' ? 'video' : 'photo'} ${i + 1} of ${media.length}">${inner}${more ? `<span class="album-more">+${more}</span>` : ''}</button>`;
+      };
+      const row = (idx) => `<div class="album-row" style="--cols:${idx.length}">${idx.map((i) => tile(i)).join('')}</div>`;
+      const n = media.length;
+      // "6 photos and 1 video"
+      const countText = (list) => { const v = list.filter((m) => m.type === 'video').length; const ph = list.length - v; const part = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`; return [ph && part(ph, 'photo'), v && part(v, 'video')].filter(Boolean).join(' and '); };
+      const grid = n <= 4
+        ? row(media.map((_, i) => i))
+        : row([0, 1]) + `<div class="album-row" style="--cols:3">${tile(2)}${tile(3)}${tile(4, n - 5)}</div>`;
+      return { media, html: `<div class="album-grid count-${Math.min(n, 5)}">${grid}</div>
+        <p class="album-note">${countText(media)} from this article · <a href="/pages/gallery.html?album=${encodeURIComponent(item.album_id)}">See the album in the Gallery</a></p>` };
+    }
+
+    // Latest news: the six newest other articles.
+    async function renderLatest() {
+      const host = document.getElementById('latest-news');
+      try {
+        const others = (await SLICNA_API.news()).filter((n) => String(n.id) !== String(id)).slice(0, 6);
+        host.innerHTML = others.length ? others.map((n) => `
+          <a class="news-side-item" href="/pages/news-detail.html?id=${encodeURIComponent(n.id)}">
+            <span class="news-side-thumb">${n.photo_url ? SLICNA.coverHtml(n.photo_url) : esc((n.title || '?').charAt(0))}</span>
+            <span><b>${esc(n.title)}</b><time>${esc(SLICNA.formatDate(n.published_at))}</time></span>
+          </a>`).join('') : '<p class="muted">No other news yet.</p>';
+      } catch (err) {
+        host.innerHTML = '<p class="muted">Latest news could not be loaded.</p>';
+      }
+    }
+    renderLatest();
+
     let item = null;
     try { item = id ? await SLICNA_API.newsItem(id) : null; } catch (err) { /* handled below */ }
 
@@ -46,14 +98,31 @@
     }
     document.title = item.title + ' | SLICNA';
     title.textContent = item.title;
-    document.getElementById('article-date').textContent = SLICNA.formatDate(item.published_at || item.event_date);
+    // "General News · 30 Aug 2026"
+    document.getElementById('article-date').innerHTML = (item.news_type ? `<span class="news-type">${esc(item.news_type)}</span>` : '') + esc(SLICNA.formatDate(item.published_at || item.event_date));
     if (item.photo_url) {
       const photo = document.getElementById('article-photo');
-      photo.innerHTML = `<img src="${SLICNA.media(item.photo_url)}" alt="">`;
+      // A cover video plays here with its own controls.
+      photo.innerHTML = SLICNA.isVideo(item.photo_url)
+        ? `<video src="${SLICNA.media(item.photo_url)}" controls playsinline preload="metadata"></video>`
+        : `<img src="${SLICNA.media(item.photo_url)}" alt="">`;
+      photo.classList.toggle('is-video', SLICNA.isVideo(item.photo_url));
       photo.hidden = false;
     }
-    // Article text is plain text from the admin panel, escaped and split into paragraphs.
-    document.getElementById('article-body').innerHTML = SLICNA.paragraphs(item.body || item.summary);
+    // Article text: HTML from the admin's rich text editor, cleaned with DOMPurify
+    // (as on SLNA), or older plain text split into paragraphs.
+    SLICNA.richText(document.getElementById('article-body'), item.body || item.summary, item.summary);
+
+    if (item.photos && item.photos.length) {
+      const album = albumHtml(item);
+      const host = document.getElementById('article-album');
+      host.innerHTML = album.html;
+      host.hidden = false;
+      host.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-i]');
+        if (t) SLICNA_VIEWER.open(album.media, Number(t.dataset.i));
+      });
+    }
   });
 </script>
 </body>

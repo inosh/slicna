@@ -8,6 +8,10 @@
 
   const BASE = '/membership/admin';
   const CATEGORIES = { LT: 'Lifetime', GM: 'General', OM: 'Ordinary', PM: 'Partial' };
+  // Upgrades open to each category (same as the backend's M.UPGRADES).
+  const UPGRADES = { GM: ['LT'], OM: ['GM', 'LT'], PM: ['OM', 'GM', 'LT'] };
+  // "Renewal" or "Upgrade to GM" for a renewal request.
+  const requestType = (r) => (r.kind === 'upgrade' ? `Upgrade to ${r.to_category}` : 'Renewal');
   const CATEGORY_OPTIONS = Object.entries(CATEGORIES).map(([k, v]) => [k, `${v} (${k})`]);
   const APP_STATUS = { pending: 'Pending', more_info_required: 'More info needed', approved: 'Approved', rejected: 'Rejected' };
   const MEMBER_STATE = { active: 'Active', renewal_due: 'Renewal due', grace: 'Grace period', lapsed: 'Lapsed', deactivated: 'Deactivated' };
@@ -33,8 +37,9 @@
     const card = document.createElement('section');
     card.className = 'admin-card';
     main.appendChild(card);
-    card.innerHTML = '<div class="admin-card-head"><div><h2>Membership applications</h2><p>Click an application to review its details, photo and payment slip.</p></div></div><div data-filters></div><div data-list></div>';
+    card.innerHTML = '<div class="admin-card-head"><div><h2>Membership applications</h2><p>Click an application to review its details, photo and payment slip.</p></div><button type="button" class="btn btn-sky btn-sm" data-refresh>Refresh</button></div><div data-filters></div><div data-list></div>';
     const listEl = card.querySelector('[data-list]');
+    card.querySelector('[data-refresh]').onclick = () => { load(); A.refreshBadges(); };
 
     const filters = filterBar(card.querySelector('[data-filters]'), {
       chipKey: 'status',
@@ -141,8 +146,8 @@
           ${locked ? '' : `<div class="action-bar">
             ${a.status === 'more_info_required' ? '<button type="button" class="btn btn-light btn-sm" data-act="info-received">Information received</button>' : ''}
             <button type="button" class="btn btn-light btn-sm" data-act="info">Request more info</button>
-            <button type="button" class="btn btn-teal btn-sm" data-act="approve">Approve…</button>
-            <button type="button" class="btn btn-light btn-sm" data-act="reject">Reject…</button>
+            <button type="button" class="btn btn-teal btn-sm" data-act="approve">Approve</button>
+            <button type="button" class="btn btn-light btn-sm" data-act="reject">Reject</button>
             <button type="button" class="btn btn-danger btn-sm" data-act="delete">Delete</button>
           </div>`}
         </div>
@@ -352,7 +357,8 @@
     card.innerHTML = `
       <div class="admin-card-head"><div><h2>Member directory</h2><p>Statuses are worked out from each member's "valid until" date and the grace period, so lapsing happens automatically.</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn btn-light btn-sm" data-export>Download Excel</button>
+          <button type="button" class="btn btn-sky btn-sm" data-refresh>Refresh</button>
+          <button type="button" class="btn btn-excel btn-sm" data-export>Download Excel</button>
           <button type="button" class="btn btn-coral btn-sm" data-add>Add member</button>
         </div></div>
       <div class="stat-tiles" data-tiles></div>
@@ -392,22 +398,37 @@
       card.querySelector(`[data-chip="${t.dataset.tile}"]`).click();
     });
 
+    // Buttons on each row. The Lapsed tab gets everything needed to follow up a
+    // lapsed member; elsewhere Renew / Upgrade, and the card has the rest.
+    // A renewal waiting for verification is reviewed first (it would block a new one).
+    const btn = (act, label, cls = 'btn-light') => `<button type="button" class="btn ${cls} btn-xs" data-row-act="${act}">${label}</button>`;
+    function rowActions(m) {
+      if (m.state === 'deactivated') return btn('reactivate', 'Reactivate', 'btn-teal');
+      if (m.has_pending_renewal) return btn('review', 'Review Renewal', 'btn-teal');
+      if (m.category === 'LT') return '';
+      // Three buttons stack in two rows (reminder on top) to keep the table narrow.
+      if (filters.state === 'lapsed') return `<div class="row-actions-stack">${btn('reminder', 'Renewal Reminder', 'btn-sky')}${btn('renew', 'Renew / Upgrade', 'btn-teal')}${btn('deactivate', 'Deactivate', 'btn-danger')}</div>`;
+      return btn('renew', 'Renew / Upgrade', 'btn-teal');
+    }
+    let rows = [];
+
     async function load() {
       listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
       try {
-        const rows = await api('GET', `${BASE}/members${query({ state: filters.state, category: filters.category, q: filters.q })}`);
+        rows = await api('GET', `${BASE}/members${query({ state: filters.state, category: filters.category, q: filters.q })}`);
         updateCounts();
         listEl.innerHTML = rows.length ? `
           <p class="admin-muted">${rows.length} member${rows.length === 1 ? '' : 's'}</p>
           <div class="admin-table-wrap"><table class="admin-table">
-            <thead><tr><th>Number</th><th>Member</th><th>Category</th><th>Valid until</th><th>Status</th></tr></thead>
+            <thead><tr><th>Number</th><th>Member</th><th>Category</th><th>Valid until</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
             <tbody>${rows.map((m) => `
               <tr class="is-clickable" data-id="${m.id}" tabindex="0">
                 <td style="white-space:nowrap">${esc(m.membership_number)}</td>
                 <td class="main-col">${esc(m.name_with_initials)}<div class="admin-muted">${esc(m.nic_number)}${m.mobile ? ' · ' + esc(m.mobile) : ''}</div></td>
                 <td>${esc(CATEGORIES[m.category])}</td>
                 <td>${m.valid_until ? esc(fmtDate(m.valid_until)) : 'Lifetime'}</td>
-                <td>${chip(m.state, MEMBER_STATE[m.state])}${m.has_pending_renewal ? '<div class="admin-muted" style="margin-top:4px">Renewal to verify</div>' : ''}</td>
+                <td>${chip(m.state, MEMBER_STATE[m.state])}${m.has_pending_renewal ? '<div class="admin-muted" style="margin-top:4px;white-space:nowrap">Renewal to verify</div>' : ''}</td>
+                <td><div class="row-actions">${rowActions(m)}</div></td>
               </tr>`).join('')}</tbody>
           </table></div>` : '<p class="admin-empty">No members here yet.</p>';
       } catch (err) {
@@ -416,16 +437,30 @@
     }
     const reload = () => { load(); loadTiles(); A.refreshBadges(); };
 
-    listEl.addEventListener('click', (e) => {
+    // A row opens the member card; in "Renewals to Verify" it opens the renewal to verify.
+    const openRow = (id) => {
+      if (filters.state === 'pending_renewal') openPendingRenewal(id, reload);
+      else memberDetail(id, reload);
+    };
+    listEl.addEventListener('click', async (e) => {
       const tr = e.target.closest('tr[data-id]');
-      if (tr) memberDetail(Number(tr.dataset.id), reload);
+      if (!tr) return;
+      const act = e.target.closest('[data-row-act]')?.dataset.rowAct;
+      if (!act) return openRow(Number(tr.dataset.id));
+      const m = rows.find((r) => r.id === Number(tr.dataset.id));
+      if (act === 'review') openPendingRenewal(m.id, reload);
+      else if (act === 'reminder') renewalLinkDialog(m);
+      else if (act === 'renew' && await renewUpgrade(m)) { toast('Membership renewed / upgraded.'); reload(); }
+      else if (act === 'deactivate' && await deactivateMember(m)) { toast('Member deactivated.'); reload(); }
+      else if (act === 'reactivate' && await reactivateMember(m)) { toast('Member reactivated.'); reload(); }
     });
     listEl.addEventListener('keydown', (e) => {
       const tr = e.target.closest('tr[data-id]');
-      if (tr && e.key === 'Enter') memberDetail(Number(tr.dataset.id), reload);
+      if (tr && e.key === 'Enter' && !e.target.closest('[data-row-act]')) openRow(Number(tr.dataset.id));
     });
 
     // The list as currently filtered, as an Excel file (named by the server).
+    card.querySelector('[data-refresh]').onclick = reload;
     card.querySelector('[data-export]').onclick = () =>
       A.downloadPrivateFile(`${BASE}/members/export.xlsx${query({ state: filters.state, category: filters.category, q: filters.q })}`);
 
@@ -446,6 +481,126 @@
     };
 
     reload();
+  }
+
+  // ---------- Member actions (table rows and the member card) ----------
+
+  async function loadFees() {
+    try { return Object.fromEntries((await api('GET', `${BASE}/settings`)).fees.map((f) => [f.category, f.amount])); } catch (err) { return {}; }
+  }
+
+  // Renew or upgrade with a payment received offline (cash, a slip handed in),
+  // verified straight away. With reactivate: true it's the Reactivate window,
+  // where renewing or upgrading is an option. Resolves true when saved.
+  async function renewUpgrade(m, { reactivate = false } = {}) {
+    const fees = await loadFees();
+    // One option per upgrade open to this category ("upgrade:GM"), each with the
+    // next free number in that category's series.
+    const targets = UPGRADES[m.category] || [];
+    const nextNumber = {};
+    await Promise.all(targets.map(async (to) => {
+      try { nextNumber[to] = (await api('GET', `${BASE}/next-number?category=${to}`)).membership_number; } catch (err) { nextNumber[to] = ''; }
+    }));
+    const fee = { renewal: fees[m.category], ...Object.fromEntries(targets.map((to) => [`upgrade:${to}`, fees[to]])) };
+    const kinds = [
+      ...(reactivate ? [['', 'No, reactivate only']] : []),
+      ['renewal', `${reactivate ? 'Yes, renew' : 'Renew'} for 12 months (${money(fee.renewal || 0)})`],
+      ...targets.map((to) => [`upgrade:${to}`, `${reactivate ? 'Yes, upgrade' : 'Upgrade'} to ${CATEGORIES[to]} (${money(fee[`upgrade:${to}`] || 0)})`]),
+    ];
+    const upgradeTo = (kind) => (kind && kind.startsWith('upgrade:') ? kind.slice(8) : null);
+    const label = (fd) => {
+      const to = upgradeTo(fd.get('kind'));
+      return to ? `upgraded to ${CATEGORIES[to]}` : 'renewed for 12 months';
+    };
+    return openForm({
+      title: reactivate ? `Reactivate ${m.membership_number}` : `Renew / Upgrade ${m.membership_number}`,
+      fields: [
+        { name: 'kind', label: reactivate ? 'Also renew or upgrade' : 'Payment for', type: 'select', required: !reactivate, options: kinds },
+        { name: 'amount', label: 'Amount received (LKR)', type: 'number', step: '0.01', required: true, half: true },
+        { name: 'payment_date', label: 'Payment date', type: 'date', required: true, half: true },
+        { name: 'payment_reference', label: 'Receipt / reference number', half: true },
+        { name: 'membership_number', label: 'New membership number', required: true, half: true, hint: `Next free number. ${m.membership_number} is kept reserved.` },
+        { name: 'status_note', label: 'Note', type: 'textarea', rows: 2 },
+      ],
+      values: { kind: reactivate ? '' : 'renewal', amount: fee.renewal, payment_date: today() },
+      // Payment fields only when there is a payment; the new number only for an upgrade.
+      onMount: (form) => {
+        const show = (name, on) => {
+          const field = form.elements[name].closest('.field');
+          field.hidden = !on;
+          field.style.display = on ? '' : 'none';
+        };
+        const sync = () => {
+          const kind = form.elements.kind.value;
+          const to = upgradeTo(kind);
+          ['amount', 'payment_date', 'payment_reference', 'status_note'].forEach((n) => show(n, Boolean(kind)));
+          show('membership_number', Boolean(to));
+          if (to) {
+            form.elements.membership_number.value = nextNumber[to] || '';
+            const hint = form.elements.membership_number.closest('.field').querySelector('.hint');
+            if (hint) hint.textContent = `Next free ${to} number. ${m.membership_number} is kept reserved.`;
+          }
+          if (kind) form.elements.amount.value = fee[kind] ?? '';
+        };
+        form.elements.kind.addEventListener('change', sync);
+        sync();
+      },
+      saveLabel: reactivate ? 'Reactivate' : 'Renew / Upgrade',
+      confirmTitle: reactivate ? 'Reactivate this member?' : 'Renew / upgrade this member?',
+      confirmMessage: (fd) => {
+        const payment = fd.get('kind')
+          ? `${m.membership_number} (${m.name_with_initials}) will be ${label(fd)}${upgradeTo(fd.get('kind')) ? ` as ${fd.get('membership_number')}` : ''}. The payment of ${money(fd.get('amount') || 0)} is recorded as verified straight away and the member is emailed.`
+          : '';
+        if (!reactivate) return `${payment}\n\nUse this for payments received outside the website (cash, a slip handed in), not online submissions.`;
+        return fd.get('kind')
+          ? `${m.membership_number} will be active again.\n\n${payment}`
+          : `${m.membership_number} (${m.name_with_initials}) will be active again. Their status will follow their "valid until" date.`;
+      },
+      submit: (fd) => {
+        // "upgrade:GM" is sent as kind = upgrade, to_category = GM.
+        const to = upgradeTo(fd.get('kind'));
+        if (to) {
+          fd.set('kind', 'upgrade');
+          fd.set('to_category', to);
+        } else {
+          fd.delete('membership_number');
+        }
+        if (reactivate && !fd.get('kind')) ['kind', 'amount', 'payment_date', 'payment_reference', 'status_note'].forEach((k) => fd.delete(k));
+        return api('POST', `${BASE}/members/${m.id}/${reactivate ? 'reactivate' : 'payments'}`, fd);
+      },
+    });
+  }
+
+  async function reactivateMember(m) {
+    if (m.category !== 'LT') return renewUpgrade(m, { reactivate: true });
+    if (!(await confirmDialog({ title: 'Reactivate member?', message: `${m.membership_number} (${m.name_with_initials}) will be active again.`, confirmText: 'Reactivate' }))) return false;
+    try {
+      await api('POST', `${BASE}/members/${m.id}/reactivate`);
+      return true;
+    } catch (err) {
+      toast(err.message, true);
+      return false;
+    }
+  }
+
+  function deactivateMember(m) {
+    return openForm({
+      title: `Deactivate ${m.membership_number}`,
+      fields: [{ name: 'reason', label: 'Reason', type: 'textarea', required: true, rows: 3, hint: 'Internal: for example "Resigned" or "Duplicate record".' }],
+      saveLabel: 'Deactivate',
+      confirmTitle: 'Deactivate this member?',
+      confirmMessage: `${m.membership_number} (${m.name_with_initials}) will be marked inactive and stop receiving reminders. The record is kept and can be reactivated.`,
+      submit: (fd) => api('POST', `${BASE}/members/${m.id}/deactivate`, fd),
+    });
+  }
+
+  // The member's renewal waiting for verification, in the Renewals window.
+  async function openPendingRenewal(memberId, onChanged) {
+    try {
+      const r = (await api('GET', `${BASE}/renewals?status=pending`)).find((x) => x.member_id === memberId);
+      if (r) renewalDetail(r, onChanged);
+      else toast('This renewal has already been reviewed.', true);
+    } catch (err) { toast(err.message, true); }
   }
 
   async function memberDetail(id, onChanged) {
@@ -475,7 +630,7 @@
             ['Grace period ends', m.grace_ends ? fmtDate(m.grace_ends) : ''],
             ['Deactivated', m.deactivated_at ? `${fmtDate(m.deactivated_at)}: ${m.deactivated_reason}` : ''],
             ['Joined through', m.source === 'manual' ? 'Added by an admin' : m.application ? `Application ${m.application.reference_number}` : 'Application'],
-            ['Previous number', (m.previous_numbers || []).map((p) => `${p.membership_number} (until ${fmtDate(p.retired_at)}, upgraded to Lifetime; reserved)`).join(', ')],
+            ['Previous number', (m.previous_numbers || []).map((p) => `${p.membership_number} (until ${fmtDate(p.retired_at)}, then upgraded; reserved)`).join(', ')],
           ])}</div>
           <div class="detail-section"><h3>Details</h3>${dl([
             ['Name', `${m.title || ''} ${m.full_name}`], ['NIC', m.nic_number], ['Date of birth', fmtDate(m.date_of_birth)], ['Sex', m.sex],
@@ -484,7 +639,7 @@
           ])}</div>
           <div class="detail-section"><h3>Payments &amp; renewals</h3>${m.renewals.length ? `<ul class="history-list">${m.renewals.map((r) => `
             <li>${chip(r.status, { pending: 'Pending', verified: 'Verified', rejected: 'Rejected' }[r.status])}
-              <strong>${r.kind === 'upgrade' ? 'Upgrade to LT' : 'Renewal'}</strong> · ${esc(money(r.amount))} · ref ${esc(r.payment_reference)}
+              <strong>${requestType(r)}</strong> · ${esc(money(r.amount))} · ref ${esc(r.payment_reference)}
               <div class="admin-muted">${r.recorded_by_admin ? 'Recorded by admin' : 'Submitted online'} ${esc(fmtDate(r.created_at))}${r.new_valid_until ? ' · valid until ' + esc(fmtDate(r.new_valid_until)) : ''}${r.reviewed_by_name ? ' · by ' + esc(r.reviewed_by_name) : ''}${r.status_note ? ' · ' + esc(r.status_note) : ''}</div>
             </li>`).join('')}</ul>` : '<p class="admin-muted">None yet.</p>'}</div>
           ${!isLt ? `<div class="detail-section"><h3>Reminder emails</h3>${m.reminders.length ? `<ul class="history-list">${m.reminders.map((r) => `
@@ -494,11 +649,12 @@
           <div class="detail-section"><h3>Photo</h3>${photoUrl ? `<img src="${photoUrl}" alt="" style="width:160px;border-radius:12px">` : '<p class="admin-muted">No photo.</p>'}</div>
           <div class="action-bar" style="flex-direction:column;align-items:stretch">
             <button type="button" class="btn btn-light btn-sm" data-act="edit">Edit details</button>
-            ${!isLt && m.state !== 'deactivated' ? '<button type="button" class="btn btn-light btn-sm" data-act="link">Renewal link…</button>' : ''}
-            ${!isLt && m.state !== 'deactivated' ? '<button type="button" class="btn btn-teal btn-sm" data-act="payment">Record a payment…</button>' : ''}
+            ${!isLt && m.state !== 'deactivated' ? '<button type="button" class="btn btn-light btn-sm" data-act="link">Renewal Reminder</button>' : ''}
+            ${m.has_pending_renewal ? '<button type="button" class="btn btn-teal btn-sm" data-act="review">Review Renewal</button>'
+              : !isLt && m.state !== 'deactivated' ? '<button type="button" class="btn btn-teal btn-sm" data-act="payment">Renew / Upgrade</button>' : ''}
             ${m.state === 'deactivated'
               ? '<button type="button" class="btn btn-teal btn-sm" data-act="reactivate">Reactivate</button>'
-              : '<button type="button" class="btn btn-danger btn-sm" data-act="deactivate">Deactivate…</button>'}
+              : '<button type="button" class="btn btn-danger btn-sm" data-act="deactivate">Deactivate</button>'}
           </div>
         </div>
       </div>`;
@@ -528,50 +684,23 @@
         if (ok) refresh('Member updated.');
       } else if (act === 'link') {
         renewalLinkDialog(m);
+      } else if (act === 'review') {
+        view.close();
+        openPendingRenewal(m.id, onChanged);
       } else if (act === 'payment') {
-        let fees = {};
-        try { fees = Object.fromEntries((await api('GET', `${BASE}/settings`)).fees.map((f) => [f.category, f.amount])); } catch (err) { /* type it */ }
-        const ok = await openForm({
-          title: 'Record a payment',
-          fields: [
-            { name: 'kind', label: 'Payment for', type: 'select', required: true, half: true, options: [['renewal', `Renewal (${money(fees[m.category] || 0)})`], ['upgrade', `Upgrade to Lifetime (${money(fees.LT || 0)})`]] },
-            { name: 'amount', label: 'Amount received (LKR)', type: 'number', step: '0.01', required: true, half: true },
-            { name: 'payment_date', label: 'Payment date', type: 'date', required: true, half: true },
-            { name: 'payment_reference', label: 'Receipt / reference number', required: true, half: true },
-            { name: 'membership_number', label: 'New Lifetime number (upgrades only)', hint: 'Leave empty to use the next free LT number.' },
-            { name: 'status_note', label: 'Note', type: 'textarea', rows: 2 },
-          ],
-          values: { kind: 'renewal', amount: fees[m.category], payment_date: today() },
-          saveLabel: 'Record payment',
-          confirmTitle: 'Record this payment?',
-          confirmMessage: `The payment is marked as verified straight away and ${m.membership_number} is renewed (or upgraded). Use this for cash or slips handed in, not online submissions.`,
-          submit: (fd) => api('POST', `${BASE}/members/${m.id}/payments`, fd),
-        });
-        if (ok) refresh('Payment recorded.');
+        if (await renewUpgrade(m)) refresh('Membership renewed / upgraded.');
       } else if (act === 'deactivate') {
-        const ok = await openForm({
-          title: 'Deactivate member',
-          fields: [{ name: 'reason', label: 'Reason', type: 'textarea', required: true, rows: 3, hint: 'Internal: for example "Resigned" or "Duplicate record".' }],
-          saveLabel: 'Deactivate',
-          confirmTitle: 'Deactivate this member?',
-          confirmMessage: `${m.membership_number} (${m.name_with_initials}) will be marked inactive and stop receiving reminders. The record is kept and can be reactivated.`,
-          submit: (fd) => api('POST', `${BASE}/members/${m.id}/deactivate`, fd),
-        });
-        if (ok) refresh('Member deactivated.');
+        if (await deactivateMember(m)) refresh('Member deactivated.');
       } else if (act === 'reactivate') {
-        if (!(await confirmDialog({ title: 'Reactivate member?', message: `${m.membership_number} will be active again. Their status will follow their "valid until" date.`, confirmText: 'Reactivate' }))) return;
-        try {
-          await api('POST', `${BASE}/members/${m.id}/reactivate`);
-          refresh('Member reactivated.');
-        } catch (err) { toast(err.message, true); }
+        if (await reactivateMember(m)) refresh('Member reactivated.');
       }
     });
   }
 
   function renewalLinkDialog(m) {
-    const view = infoDialog({ title: 'Renewal link', wide: false });
+    const view = infoDialog({ title: `Renewal Reminder · ${m.membership_number}`, wide: false });
     view.body.innerHTML = `
-      <p>A personal link that opens ${esc(m.name_with_initials)}'s renewal page with their details filled in. It works for 90 days, and they confirm with their NIC number.</p>
+      <p>Email ${esc(m.name_with_initials)} a renewal reminder, or copy their personal renewal link to send by WhatsApp or SMS. The link opens their renewal page with their details filled in and works for 90 days.</p>
       <div class="action-bar" style="border-top:0;margin-top:0;padding-top:0">
         <button type="button" class="btn btn-light btn-sm" data-act="create">Create link to copy</button>
         ${m.email ? `<button type="button" class="btn btn-teal btn-sm" data-act="email">Email link to ${esc(m.email)}</button>` : '<span class="admin-muted">No email address on record.</span>'}
@@ -607,8 +736,9 @@
     const card = document.createElement('section');
     card.className = 'admin-card';
     main.appendChild(card);
-    card.innerHTML = '<div class="admin-card-head"><div><h2>Renewals &amp; upgrades</h2><p>Check each payment slip, then verify or reject it.</p></div></div><div data-filters></div><div data-list></div>';
+    card.innerHTML = '<div class="admin-card-head"><div><h2>Renewals &amp; upgrades</h2><p>Check each payment slip, then verify or reject it.</p></div><button type="button" class="btn btn-sky btn-sm" data-refresh>Refresh</button></div><div data-filters></div><div data-list></div>';
     const listEl = card.querySelector('[data-list]');
+    card.querySelector('[data-refresh]').onclick = () => { load(); A.refreshBadges(); };
     const filters = filterBar(card.querySelector('[data-filters]'), {
       chipKey: 'status', search: false,
       chips: [['pending', 'To Verify'], ['verified', 'Verified'], ['rejected', 'Rejected'], ['all', 'All']],
@@ -635,7 +765,7 @@
               <tr class="is-clickable" data-id="${r.id}" tabindex="0">
                 <td>${esc(fmtDate(r.created_at))}</td>
                 <td class="main-col">${esc(r.membership_number)}<div class="admin-muted">${esc(r.name_with_initials)}</div></td>
-                <td>${r.kind === 'upgrade' ? 'Upgrade to LT' : 'Renewal'}${r.recorded_by_admin ? '<div class="admin-muted">Recorded by admin</div>' : ''}</td>
+                <td>${requestType(r)}${r.recorded_by_admin ? '<div class="admin-muted">Recorded by admin</div>' : ''}</td>
                 <td>${esc(money(r.amount))}</td>
                 <td>${esc(r.payment_reference)}</td>
                 <td>${chip(r.status, { pending: 'To verify', verified: 'Verified', rejected: 'Rejected' }[r.status])}</td>
@@ -661,12 +791,12 @@
         <div>
           <div class="detail-section"><h3>Payment</h3>${dl([
             ['Member', `${r.membership_number} · ${r.name_with_initials}`],
-            ['Type', r.kind === 'upgrade' ? `Upgrade ${r.from_category} → Lifetime` : `Renewal of ${CATEGORIES[r.from_category]}`],
+            ['Type', r.kind === 'upgrade' ? `Upgrade ${r.from_category} → ${r.to_category} (${CATEGORIES[r.to_category]})` : `Renewal of ${CATEGORIES[r.from_category]}`],
             ['Previous number', r.previous_membership_number ? `${r.previous_membership_number} (reserved, not reused)` : ''],
             ['Amount due', money(r.amount)], ['Payment reference', r.payment_reference], ['Paid on', fmtDate(r.payment_date)],
             ['Submitted', fmtDateTime(r.created_at)],
             ['Valid until (before)', r.previous_valid_until ? fmtDate(r.previous_valid_until) : ''],
-            ['Valid until (after)', r.new_valid_until ? fmtDate(r.new_valid_until) : r.status === 'pending' ? (r.kind === 'upgrade' ? 'Lifetime' : 'One year more, set when verified') : ''],
+            ['Valid until (after)', r.new_valid_until ? fmtDate(r.new_valid_until) : r.status === 'pending' ? (r.to_category === 'LT' ? 'Lifetime' : 'One year more, set when verified') : ''],
             ['Status', html(chip(r.status, { pending: 'To verify', verified: 'Verified', rejected: 'Rejected' }[r.status]))],
             ['Message to member', r.status_note],
           ])}</div>
@@ -679,7 +809,7 @@
           <div class="detail-section"><h3>Payment slip</h3><div data-docs></div></div>
           ${r.status === 'pending' ? `<div class="action-bar">
             <button type="button" class="btn btn-teal btn-sm" data-act="verify">Verify payment</button>
-            <button type="button" class="btn btn-light btn-sm" data-act="reject">Reject…</button>
+            <button type="button" class="btn btn-light btn-sm" data-act="reject">Reject</button>
           </div>` : ''}
           <p style="margin-top:12px"><button type="button" class="btn btn-light btn-sm" data-act="member">Open member</button></p>
         </div>
@@ -697,15 +827,15 @@
       } else if (act === 'verify') {
         if (r.kind === 'upgrade') {
           let suggestion = '';
-          try { suggestion = (await api('GET', `${BASE}/next-number?category=LT`)).membership_number; } catch (err) { /* type it */ }
+          try { suggestion = (await api('GET', `${BASE}/next-number?category=${r.to_category}`)).membership_number; } catch (err) { /* type it */ }
           const ok = await openForm({
-            title: 'Verify upgrade to Lifetime',
-            fields: [{ name: 'membership_number', label: 'New Lifetime membership number', required: true, hint: `The member's current number is ${r.membership_number}.` }],
+            title: `Verify upgrade to ${CATEGORIES[r.to_category]}`,
+            fields: [{ name: 'membership_number', label: `New ${CATEGORIES[r.to_category]} membership number`, required: true, hint: `Next free ${r.to_category} number. The member's current number is ${r.membership_number}.` }],
             values: { membership_number: suggestion },
             hidden: { status: 'verified' },
             saveLabel: 'Verify and upgrade',
             confirmTitle: 'Verify this payment and upgrade?',
-            confirmMessage: `Confirm you've checked the payment slip for ${money(r.amount)} (${r.payment_reference}). ${r.name_with_initials} becomes a Lifetime member and is emailed.`,
+            confirmMessage: `Confirm you've checked the payment slip for ${money(r.amount)} (${r.payment_reference}). ${r.name_with_initials} becomes a ${CATEGORIES[r.to_category]} member${r.to_category === 'LT' ? '' : ' (valid for 12 months, like a renewal)'} and is emailed.`,
             submit: (fd) => api('PATCH', `${BASE}/renewals/${r.id}`, fd),
           });
           if (ok) done('Upgrade verified.');
@@ -758,9 +888,15 @@
         </table></div>
 
         <div class="settings-section">
-          <div class="admin-card-head"><div><h2>Bank details</h2><p>Shown wherever people pay: membership, renewals and paid events.</p></div>
+          <div class="admin-card-head"><div><h2>Bank details: membership</h2><p>Shown for membership fees and renewals.</p></div>
             <button type="button" class="btn btn-light btn-sm" data-edit-bank>Edit</button></div>
           ${dl([['Bank', s.bank.bank_name], ['Account number', s.bank.account_number], ['Branch', s.bank.branch], ['Account name', s.bank.account_name]])}
+        </div>
+
+        <div class="settings-section">
+          <div class="admin-card-head"><div><h2>Bank details: CPD events</h2><p>Shown on paid CPD event pages and the event registration form.</p></div>
+            <button type="button" class="btn btn-light btn-sm" data-edit-event-bank>Edit</button></div>
+          ${dl([['Bank', s.event_bank.bank_name], ['Account number', s.event_bank.account_number], ['Branch', s.event_bank.branch], ['Account name', s.event_bank.account_name]])}
         </div>
 
         <div class="settings-section">
@@ -772,7 +908,7 @@
         <div class="admin-card-head" style="margin-top:28px"><div><h2>Renewal reminder emails</h2>
           <p>A daily scheduled job sends reminders (${s.notice_days} and 7 days before expiry, on expiry, 14 days before the grace period ends, and when a membership lapses). You can also run it now.</p></div>
           <button type="button" class="btn btn-teal btn-sm" data-run>Send due reminders now</button></div>
-        ${s.email_configured ? '<p class="callout">Email sending is switched on.</p>' : '<p class="callout callout-warn"><strong>Email sending is not set up yet.</strong> Reminders and notifications are logged but not sent until a Resend API key is added to the backend. Meanwhile, use "Renewal link…" on a member to copy their link and send it by WhatsApp or SMS.</p>'}
+        ${s.email_configured ? '<p class="callout">Email sending is switched on.</p>' : '<p class="callout callout-warn"><strong>Email sending is not set up yet.</strong> Reminders and notifications are logged but not sent until a Resend API key is added to the backend. Meanwhile, use "Renewal Reminder" on a member to copy their link and send it by WhatsApp or SMS.</p>'}
         <div data-run-result></div>`;
 
       card.querySelectorAll('[data-fee]').forEach((btn) => {
@@ -793,7 +929,7 @@
 
       card.querySelector('[data-edit-bank]').onclick = async () => {
         const ok = await openForm({
-          title: 'Bank details',
+          title: 'Bank details: membership',
           fields: [
             { name: 'bank_name', label: 'Bank', required: true, half: true },
             { name: 'bank_branch', label: 'Branch', required: true, half: true },
@@ -803,10 +939,29 @@
           values: { bank_name: s.bank.bank_name, bank_branch: s.bank.branch, bank_account_number: s.bank.account_number, bank_account_name: s.bank.account_name },
           saveLabel: 'Save bank details',
           confirmTitle: 'Save these bank details?',
-          confirmMessage: 'The new details show on the membership, renewal and event pages straight away.',
+          confirmMessage: 'The new details show on the membership and renewal pages straight away.',
           submit: (fd) => api('PUT', `${BASE}/settings`, fd),
         });
         if (ok) { toast('Bank details saved.'); load(); }
+      };
+
+      card.querySelector('[data-edit-event-bank]').onclick = async () => {
+        const b = s.event_bank;
+        const ok = await openForm({
+          title: 'Bank details: CPD events',
+          fields: [
+            { name: 'event_bank_name', label: 'Bank', required: true, half: true },
+            { name: 'event_bank_branch', label: 'Branch', required: true, half: true },
+            { name: 'event_bank_account_number', label: 'Account number', required: true, half: true },
+            { name: 'event_bank_account_name', label: 'Account name', required: true, half: true },
+          ],
+          values: { event_bank_name: b.bank_name, event_bank_branch: b.branch, event_bank_account_number: b.account_number, event_bank_account_name: b.account_name },
+          saveLabel: 'Save bank details',
+          confirmTitle: 'Save these bank details?',
+          confirmMessage: 'The new details show on paid CPD event pages and the registration form straight away.',
+          submit: (fd) => api('PUT', `${BASE}/settings`, fd),
+        });
+        if (ok) { toast('Event bank details saved.'); load(); }
       };
 
       card.querySelector('[data-edit-renewals]').onclick = async () => {

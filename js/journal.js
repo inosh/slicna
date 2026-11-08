@@ -99,10 +99,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     stage.insertBefore(book, $('book-next'));
 
-    // Height that fits: the visible window minus the reader's header and footer.
+    // As big as fits: the window height minus the reader's own header, footer and
+    // padding (and, outside full screen, the site's sticky menu), measured, so the
+    // pages get every pixel that's left. The width follows from the page shape;
+    // the library shrinks it if the stage is narrower.
     const fullscreen = Boolean(document.fullscreenElement);
-    const maxHeight = Math.max(320, window.innerHeight - (fullscreen ? 200 : 260));
-    const maxWidth = Math.min(900, Math.round(maxHeight / ratio));
+    const px = (v) => parseFloat(v) || 0;
+    const outer = (el) => { const s = getComputedStyle(el); return el.offsetHeight + px(s.marginTop) + px(s.marginBottom); };
+    const readerStyle = getComputedStyle(reader);
+    const stageStyle = getComputedStyle(stage);
+    let used = px(readerStyle.paddingTop) + px(readerStyle.paddingBottom) + px(stageStyle.paddingTop) + px(stageStyle.paddingBottom);
+    [...reader.children].forEach((el) => {
+      if (el === stage || el.hidden || getComputedStyle(el).position === 'fixed') return;
+      used += outer(el);
+    });
+    if (!fullscreen) {
+      const menu = document.querySelector('.nav-shell');
+      used += (menu ? menu.offsetHeight : 0) + 20;
+    }
+    const maxHeight = Math.max(320, Math.floor(window.innerHeight - used));
+    const maxWidth = Math.round(maxHeight / ratio);
     flip = new St.PageFlip(book, {
       width: 500, height: Math.round(500 * ratio), size: 'stretch',
       minWidth: 240, maxWidth, minHeight: Math.round(240 * ratio), maxHeight,

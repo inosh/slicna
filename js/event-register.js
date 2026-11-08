@@ -26,8 +26,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('crumb-event').href = `/pages/event-detail.html?id=${encodeURIComponent(event.id)}`;
   $('reg-lede').textContent = [SLICNA.formatDate(event.event_date) + (event.end_date ? ' – ' + SLICNA.formatDate(event.end_date) : ''), event.time_text, event.location].filter(Boolean).join(' · ');
 
-  const state = { type: null, member: null, fee: null };
-  const money = (n) => (Number(n) ? SLICNA.formatMoney(n) : 'Free');
+  const state = { type: null, member: null, fee: null, currency: 'LKR', attendance: null };
+  const money = (n, currency) => (Number(n) ? SLICNA.formatMoney(n, currency) : 'Free');
+  // Foreign participants: online and/or physical, each with a USD fee.
+  const foreign = event.foreign || [];
 
   function renderSummary() {
     const facts = [
@@ -40,10 +42,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       <p class="eyebrow" style="margin-bottom:6px">You're registering for</p>
       <h2 class="summary-title">${esc(event.title)}</h2>
       <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-      <div class="event-fees"><h3>Event fee</h3>${event.fees.length
-        ? `<ul class="fee-list">${event.fees.map((f) => `<li><span>${esc(f.label)}</span><b>${esc(money(f.amount))}</b></li>`).join('')}</ul>`
+      <div class="event-fees"><h3>Event fee</h3>${event.fees.length || foreign.some((f) => f.amount)
+        ? `<ul class="fee-list">${[
+          ...event.fees.map((f) => [f.label, money(f.amount)]),
+          ...foreign.map((f) => [`Foreign participants – ${f.mode}`, money(f.amount, f.currency)]),
+        ].map(([label, amount]) => `<li><span>${esc(label)}</span><b>${esc(amount)}</b></li>`).join('')}</ul>`
         : '<p class="fee-free">Free of charge</p>'}</div>
-      ${state.fee !== null ? `<div class="your-fee"><span>Your fee</span><b>${esc(money(state.fee))}</b></div>` : ''}`;
+      ${state.fee !== null ? `<div class="your-fee"><span>Your fee</span><b>${esc(money(state.fee, state.currency))}</b></div>` : ''}`;
   }
 
   function showClosed(message) {
@@ -68,10 +73,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     form.querySelector('[name="registrant_type"][value="member"]').checked = true;
   }
 
+  // Foreign participants get a third choice, then online / physical.
+  if (foreign.length) {
+    $('foreign-choice').hidden = false;
+    $('type-legend').textContent = 'How are you registering?';
+    $('foreign-meta').textContent = `From outside Sri Lanka: ${foreign.map((f) => `${f.mode} ${money(f.amount, f.currency).replace('Free', 'free')}`).join(', ')}.`;
+    $('attend-choices').innerHTML = foreign.map((f) => `<label class="choice"><input type="radio" name="attendance" value="${f.mode}"><span class="choice-box"><b>${esc(f.label)}</b><span class="choice-meta">${esc(money(f.amount, f.currency))}</span></span></label>`).join('');
+    $('attend-choices').querySelectorAll('[name="attendance"]').forEach((r) => r.addEventListener('change', () => chooseAttendance(r.value)));
+  }
+
+  // NIC for Sri Lankans; passport number, country and an international mobile for foreign participants.
+  function setForeignFields(isForeign) {
+    const nic = $('nic_number');
+    $('nic-label').textContent = isForeign ? 'Passport number' : 'NIC number';
+    nic.maxLength = isForeign ? 20 : 12;
+    if (isForeign) delete nic.dataset.nic; else nic.dataset.nic = '';
+    $('country-field').hidden = !isForeign;
+    $('country').required = isForeign;
+    $('slnc-label').innerHTML = isForeign ? 'Nursing registration number <span class="opt">(optional)</span>' : 'SLNC registration number <span class="opt">(optional)</span>';
+    $('mobile').placeholder = isForeign ? '+960 7XXXXXX' : '07XXXXXXXX';
+    $('mobile').dataset.phone = isForeign ? 'intl' : 'mobile';
+    $('pay-how').textContent = isForeign
+      ? 'Pay the US dollar amount by international bank transfer to the account below, then upload the transfer confirmation or a screenshot.'
+      : 'Pay by bank transfer or deposit, then upload the slip or a screenshot below.';
+  }
+
+  function chooseAttendance(mode) {
+    const option = foreign.find((f) => f.mode === mode);
+    state.attendance = option ? mode : null;
+    if (!option) return;
+    showDetails(true);
+    setFee(option.amount, 'USD');
+  }
+
   // ---------- Steps ----------
 
-  function setFee(fee) {
+  function setFee(fee, currency = 'LKR') {
     state.fee = fee;
+    state.currency = currency;
     const paid = fee !== null && fee > 0;
     $('payment-step').hidden = fee === null;
     $('payment-paid').hidden = !paid;
@@ -79,7 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('payment_date').required = paid;
     $('receipt').required = paid;
     if (paid) {
-      $('amount-due').textContent = SLICNA.formatMoney(fee);
+      $('amount-due').textContent = SLICNA.formatMoney(fee, currency);
       if (!$('bank-details').innerHTML && event.bank) $('bank-details').innerHTML = MS.bankBox(event.bank);
     }
     renderSummary();
@@ -93,9 +132,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   function chooseType(type) {
     state.type = type;
     state.member = null;
+    state.attendance = null;
     $('member-result').hidden = true;
     $('member-check').hidden = type !== 'member';
-    if (type === 'non_member') {
+    $('foreign-attend').hidden = type !== 'foreign';
+    setForeignFields(type === 'foreign');
+    if (type === 'foreign') {
+      $('attend-choices').querySelectorAll('[name="attendance"]').forEach((r) => { r.checked = false; });
+      showDetails(false);
+      // Only one way to attend: choose it straight away.
+      if (foreign.length === 1) {
+        $('attend-choices').querySelector('[name="attendance"]').checked = true;
+        chooseAttendance(foreign[0].mode);
+      }
+    } else if (type === 'non_member') {
       showDetails(true);
       setFee(event.fee_by_category.NM);
     } else {
@@ -120,8 +170,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // checked by SLICNA.
   $('check-btn').addEventListener('click', async () => {
     const number = $('membership_number').value.trim();
-    if (!/^(LT|GM|OM|PM)\s*\d{1,4}\s*\/\s*\d{2}$/i.test(number)) {
-      return memberResult('Enter your membership number like GM 0012/25: LT, GM, OM or PM, the number and the year.', false);
+    if (!/^(LT|GM|OM|PM)\s*\d{1,4}\s*(\/\s*\d{2})?$/i.test(number)) {
+      return memberResult('Enter your membership number like GM 0012/25: LT, GM, OM or PM and the number. The year is optional.', false);
     }
     const btn = $('check-btn');
     btn.disabled = true;
@@ -225,7 +275,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (el.required && !v) return problems.push([el, 'This is required.']);
       if (!v) return;
       if ('nic' in el.dataset && !/^(\d{9}[VvXx]|\d{12})$/.test(v.replace(/\s/g, ''))) problems.push([el, 'Enter 12 digits, or 9 digits followed by V or X.']);
-      if (el.dataset.phone && !/^(?:\+94|0)7[0-8][0-9]{7}$/.test(v.replace(/[\s-]/g, ''))) problems.push([el, 'Enter a mobile number like 07XXXXXXXX or +947XXXXXXXX.']);
+      if (el.dataset.phone === 'mobile' && !/^(?:\+94|0)7[0-8][0-9]{7}$/.test(v.replace(/[\s-]/g, ''))) problems.push([el, 'Enter a mobile number like 07XXXXXXXX or +947XXXXXXXX.']);
+      if (el.dataset.phone === 'intl' && !/^\+?\d{7,15}$/.test(v.replace(/[\s()-]/g, ''))) problems.push([el, 'Enter your mobile number with the country code, for example +960 7771234.']);
+      if (el.id === 'nic_number' && state.type === 'foreign' && !/^[A-Za-z0-9-]{5,20}$/.test(v.replace(/\s/g, ''))) problems.push([el, 'Enter your passport number (letters and numbers only).']);
       if (el.type === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) problems.push([el, 'Please enter a valid email address.']);
       if (el.type === 'date' && v > new Date().toISOString().slice(0, 10)) problems.push([el, 'This date cannot be in the future.']);
     });
@@ -242,7 +294,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     statusEl.className = 'form-status';
     if (!state.type || state.fee === null) {
-      SLICNA_FORM_ERRORS.showError(form, statusEl, state.type === 'member' ? 'Please check your membership first.' : 'Please choose whether you are a member.');
+      SLICNA_FORM_ERRORS.showError(form, statusEl, state.type === 'member' ? 'Please check your membership first.'
+        : state.type === 'foreign' ? 'Please choose whether you will attend online or physically.' : 'Please choose whether you are a member.');
       return;
     }
     if (!validate()) return;
@@ -254,6 +307,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       data.delete('membership_number');
     }
+    if (state.type === 'foreign') data.set('attendance', state.attendance);
+    else { data.delete('attendance'); data.delete('country'); }
     if (!(state.fee > 0)) ['pay_by', 'payment_date', 'receipt'].forEach((k) => data.delete(k));
     else if (!$('receipt').files.length) data.delete('receipt');
 
@@ -279,7 +334,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <p>Thank you. Your registration for <strong>${esc(result.event_title)}</strong> has been sent to SLICNA.</p>
       <div class="ref-box"><span>Your reference</span><b>${esc(result.reference_number)}</b></div>
       <ul class="check-list">
-        ${Number(result.amount_due) > 0 ? `<li>We'll check your payment of ${esc(SLICNA.formatMoney(result.amount_due))}.</li>` : ''}
+        ${Number(result.amount_due) > 0 ? `<li>We'll check your payment of ${esc(SLICNA.formatMoney(result.amount_due, result.currency || 'LKR'))}.</li>` : ''}
         <li>You'll get an email at <strong>${esc(result.email)}</strong> once your place is confirmed.</li>
         <li>Questions? Call 071 338 5768 or email slicna2022@gmail.com and quote your reference.</li>
       </ul>

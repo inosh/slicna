@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ROOT = __dirname;
 const DIST = path.join(ROOT, 'dist');
@@ -38,12 +39,37 @@ function copyDir(src, dest) {
   }
 }
 
+// Cache-busting: each local stylesheet and script link gets ?v=<short hash of
+// the file>, e.g. /css/site.css?v=3f9a2c1d. The tag changes only when the file
+// does, so browsers keep unchanged files and fetch an updated one straight away.
+const ASSET_RE = /\b(href|src)="(\/(?:css|js)\/[^"?#]+\.(?:css|js))"/g;
+const assetVersions = new Map();
+
+function assetVersion(publicPath) {
+  if (!assetVersions.has(publicPath)) {
+    const file = path.join(ROOT, publicPath.slice(1));
+    const version = fs.existsSync(file)
+      ? crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8)
+      : null;
+    assetVersions.set(publicPath, version);
+  }
+  return assetVersions.get(publicPath);
+}
+
+function versionAssets(html) {
+  return html.replace(ASSET_RE, (match, attr, publicPath) => {
+    const version = assetVersion(publicPath);
+    return version ? `${attr}="${publicPath}?v=${version}"` : match;
+  });
+}
+
 function buildPage(srcPath, relativePath, header, footer) {
   const destPath = path.join(DIST, relativePath);
   let html = fs.readFileSync(srcPath, 'utf8');
 
   if (HEADER_RE.test(html)) html = html.replace(HEADER_RE, () => header);
   if (FOOTER_RE.test(html)) html = html.replace(FOOTER_RE, () => footer);
+  html = versionAssets(html);
 
   const posixPath = relativePath.split(path.sep).join('/');
   if (!SKIP_CANONICAL.has(posixPath)) {
@@ -56,6 +82,7 @@ function buildPage(srcPath, relativePath, header, footer) {
 
 // clean=false overwrites dist/ in place; the dev server uses it because Windows can lock the folder while it's being served.
 function build({ clean = true } = {}) {
+  assetVersions.clear(); // the dev server rebuilds in the same process: re-read changed files
   const header = readPartial('header.html');
   const footer = readPartial('footer.html');
 

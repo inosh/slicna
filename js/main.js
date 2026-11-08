@@ -30,7 +30,7 @@ const SLICNA = (() => {
     return Number(points).toFixed(points % 1 ? 1 : 0);
   }
 
-  const formatMoney = (n) => 'LKR ' + Number(n).toLocaleString('en-LK', { maximumFractionDigits: 2 });
+  const formatMoney = (n, currency = 'LKR') => `${currency} ` + Number(n).toLocaleString('en-LK', { maximumFractionDigits: 2 });
 
   // Type tag colour: CPD teal, international workshops gold, other events coral.
   function typeTag(event) {
@@ -38,10 +38,14 @@ const SLICNA = (() => {
     return `<span class="${cls}">${escapeHtml(event.event_type || CATEGORY_LABELS[event.category] || 'Event')}</span>`;
   }
 
+  // "CPD" first on CPD events in the lists, so they stand out from association events.
+  const cpdTag = (event) => (event.category === 'cpd' ? '<span class="tag-cpd">CPD</span>' : '');
+
   // Status badge for upcoming events ("Registration Open" stands out).
   function statusBadge(event) {
     if (event.is_past || !event.status_label) return '';
-    return `<span class="event-status event-status-${escapeHtml(event.status)}">${escapeHtml(event.status_label)}</span>`;
+    const ongoing = event.is_ongoing ? ' <span class="event-status event-status-ongoing">Ongoing</span>' : '';
+    return `<span class="event-status event-status-${escapeHtml(event.status)}">${escapeHtml(event.status_label)}</span>${ongoing}`;
   }
 
   // "Free", "LKR 1,500" or a range ("Free – LKR 1,500") for the lists.
@@ -65,7 +69,7 @@ const SLICNA = (() => {
       <a class="event-row" href="/pages/event-detail.html?id=${encodeURIComponent(event.id)}">
         <div class="date-tile"><b>${day}</b><span>${mon}</span></div>
         <div>
-          <div class="event-tags">${typeTag(event)}${statusBadge(event)}</div>
+          <div class="event-tags">${cpdTag(event)}${typeTag(event)}${statusBadge(event)}</div>
           <h3>${escapeHtml(event.title)}</h3>
           <div class="event-meta">${event.location ? `<span>${escapeHtml(event.location)}</span>` : ''}${points}${fee}</div>
         </div>
@@ -74,6 +78,24 @@ const SLICNA = (() => {
   }
 
   // Plain text from the admin panel -> escaped paragraphs (blank line = new paragraph).
+  // Rich text from the admin's editor (news articles, event details), cleaned with
+  // DOMPurify (the page must load js/vendor/purify.min.js); older plain text
+  // becomes paragraphs. Pictures are "/uploads/..." paths on the API server;
+  // links open in a new tab.
+  function richText(el, value, fallback = '') {
+    const isHtml = /<(p|h[1-6]|ul|ol|li|blockquote|br|strong|em|u|a|img)\b/i.test(value || '');
+    if (!isHtml || !window.DOMPurify) {
+      el.innerHTML = paragraphs(isHtml ? fallback : (value || fallback));
+      return;
+    }
+    el.innerHTML = window.DOMPurify.sanitize(value, {
+      ALLOWED_TAGS: ['p', 'br', 'h2', 'h3', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'span'],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'title'],
+    });
+    el.querySelectorAll('img').forEach((img) => { img.src = media(img.getAttribute('src')); img.loading = 'lazy'; });
+    el.querySelectorAll('a[href]').forEach((a) => { a.target = '_blank'; a.rel = 'noopener'; });
+  }
+
   function paragraphs(text) {
     return String(text || '')
       .split(/\n\s*\n/)
@@ -87,13 +109,21 @@ const SLICNA = (() => {
     return escapeHtml(SLICNA_API.mediaUrl(url));
   }
 
+  // A video file (news covers may be videos): MP4, WEBM, MOV or OGG.
+  const isVideo = (url) => /\.(mp4|m4v|webm|mov|ogg|ogv)$/i.test(String(url || ''));
+
+  // A cover for cards and lists: the photo, or the video's first frame with a play mark.
+  const coverHtml = (url) => (isVideo(url)
+    ? `<video src="${media(url)}" muted playsinline preload="metadata"></video><span class="media-play" aria-hidden="true">&#9658;</span>`
+    : `<img src="${media(url)}" alt="" loading="lazy">`);
+
   function newsCard(item, lead = false) {
-    const img = item.photo_url ? `<img src="${media(item.photo_url)}" alt="" loading="lazy">` : '';
+    const img = item.photo_url ? coverHtml(item.photo_url) : '';
     return `
       <a class="news-card${lead ? ' is-lead' : ''}" href="/pages/news-detail.html?id=${encodeURIComponent(item.id)}">
         <div class="thumb">${img}</div>
         <div class="body">
-          <time>${formatDate(item.published_at || item.event_date)}</time>
+          <p class="news-meta"><time>${formatDate(item.published_at || item.event_date)}</time>${item.news_type ? `<span class="news-type">${escapeHtml(item.news_type)}</span>` : ''}</p>
           <h3>${escapeHtml(item.title)}</h3>
           ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ''}
         </div>
@@ -170,5 +200,5 @@ const SLICNA = (() => {
     document.querySelectorAll('[data-year]').forEach((el) => { el.textContent = new Date().getFullYear(); });
   });
 
-  return { escapeHtml, formatDate, parseDate, isUpcoming, formatPoints, formatMoney, typeTag, statusBadge, feeShort, eventRow, newsCard, paragraphs, media, CATEGORY_LABELS };
+  return { escapeHtml, formatDate, parseDate, isUpcoming, formatPoints, formatMoney, typeTag, cpdTag, statusBadge, feeShort, eventRow, newsCard, paragraphs, richText, media, isVideo, coverHtml, CATEGORY_LABELS };
 })();

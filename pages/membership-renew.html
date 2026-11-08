@@ -23,7 +23,7 @@
       <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / <a href="/pages/membership.html">Membership</a> / Renew</nav>
       <p class="eyebrow">Membership</p>
       <h1>Renew your membership</h1>
-      <p class="lede">General, Ordinary and Partial memberships are renewed every 12 months. You can also upgrade to Lifetime Membership here.</p>
+      <p class="lede">General, Ordinary and Partial memberships are renewed every 12 months. You can also upgrade to another membership here.</p>
     </div>
   </section>
 
@@ -33,8 +33,7 @@
         <h2 style="font-size:24px">Find your membership</h2>
         <p class="muted">If you have a renewal link from our email, open that instead: it takes you straight to your details.</p>
         <div class="form-grid">
-          <div class="field"><label for="lookup-number">Membership number</label><input id="lookup-number" required placeholder="e.g. GM 0012/25" autocomplete="off"></div>
-          <div class="field"><label for="lookup-nic">NIC number</label><input id="lookup-nic" required maxlength="12"></div>
+          <div class="field"><label for="lookup-number">Membership number</label><input id="lookup-number" required placeholder="e.g. GM 0012/25" autocomplete="off" aria-describedby="lookup-hint"><p class="hint" id="lookup-hint">The year is optional: GM 0012 works too.</p></div>
           <div class="full"><button class="btn btn-coral" type="submit">Continue</button></div>
         </div>
         <div class="form-status" id="lookup-error" role="status"></div>

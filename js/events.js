@@ -1,15 +1,16 @@
 // Events page: a spotlight on the next CPD event, then the list filtered by
-// kind (CPD / other / all) and upcoming / past. ?kind=other preselects a tab.
+// kind (CPD / association / all) and upcoming / past. ?kind=other and ?when=past preselect them.
 document.addEventListener('DOMContentLoaded', async () => {
   const esc = SLICNA.escapeHtml;
   const listEl = document.getElementById('events-list');
   const countEl = document.getElementById('events-count');
   const params = new URLSearchParams(window.location.search);
-  const state = { kind: ['cpd', 'other', 'all'].includes(params.get('kind')) ? params.get('kind') : 'cpd', when: 'upcoming' };
+  const state = { kind: ['cpd', 'other', 'all'].includes(params.get('kind')) ? params.get('kind') : 'cpd', when: params.get('when') === 'past' ? 'past' : 'upcoming' };
   document.querySelector(`[name="kind"][value="${state.kind}"]`).checked = true;
+  document.querySelector(`[name="when"][value="${state.when}"]`).checked = true;
   let events = [];
 
-  const KIND_WORDS = { cpd: 'CPD events', other: 'other events', all: 'events' };
+  const KIND_WORDS = { cpd: 'CPD events', other: 'association events', all: 'events' };
 
   function render() {
     let list = events.filter((e) => state.kind === 'all' || e.category === state.kind);
@@ -41,7 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ${e.photo_url ? `<a class="spotlight-media" href="/pages/event-detail.html?id=${encodeURIComponent(e.id)}"><img src="${SLICNA.media(e.photo_url)}" alt=""></a>` : ''}
         <div class="spotlight-body">
           <p class="eyebrow">Next CPD event</p>
-          <div class="event-tags">${SLICNA.typeTag(e)}${SLICNA.statusBadge(e)}</div>
+          <div class="event-tags">${SLICNA.cpdTag(e)}${SLICNA.typeTag(e)}${SLICNA.statusBadge(e)}</div>
           <h2>${esc(e.title)}</h2>
           ${e.summary ? `<p class="muted">${esc(e.summary)}</p>` : ''}
           <dl class="spotlight-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
@@ -56,19 +57,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.querySelector('.events-toolbar').addEventListener('change', (e) => {
     state[e.target.name] = e.target.value;
-    if (e.target.name === 'kind') {
+    // The address follows the choice (?kind=other, ?when=past), so links and Back keep it.
+    if (e.target.name === 'kind' || e.target.name === 'when') {
       const url = new URL(window.location.href);
       if (state.kind === 'cpd') url.searchParams.delete('kind');
       else url.searchParams.set('kind', state.kind);
+      if (state.when === 'upcoming') url.searchParams.delete('when');
+      else url.searchParams.set('when', state.when);
       history.replaceState(null, '', url);
     }
     render();
   });
 
+  // Opened from the Events menu (#all-events): bring the list into view once it has loaded.
+  const jumpToList = () => {
+    if (location.hash !== '#all-events') return;
+    document.getElementById('all-events').scrollIntoView({ block: 'start' });
+  };
+
   try {
     events = await SLICNA_API.events();
     renderSpotlight();
     render();
+    jumpToList();
+    window.addEventListener('hashchange', jumpToList);
   } catch (err) {
     listEl.innerHTML = '<p class="empty">Events could not be loaded right now.</p>';
   }

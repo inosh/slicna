@@ -77,5 +77,8 @@ const SLICNA_MEMBERSHIP = (() => {
     return null;
   }
 
-  return { CATEGORIES, ORDER, money, period, bankBox, bindFilePreview, fileProblem };
+  // Today as YYYY-MM-DD in this device's time zone (default for "Date you paid").
+  const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+  return { CATEGORIES, ORDER, money, period, bankBox, bindFilePreview, fileProblem, today };
 })();

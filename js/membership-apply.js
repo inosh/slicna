@@ -351,6 +351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const fromUrl = (new URLSearchParams(location.search).get('category') || '').toUpperCase();
   renderCategoryChoices();
   const restored = restoreDraft();
+  if (!form.payment_date.value) form.payment_date.value = MS.today();
   const startCategory = MS.CATEGORIES[fromUrl] ? fromUrl : typeof restored === 'string' ? restored : null;
   if (startCategory) {
     const radio = form.querySelector(`input[name="category"][value="${startCategory}"]`);

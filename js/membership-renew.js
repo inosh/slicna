@@ -1,6 +1,7 @@
 // Renewal page. Opened from a personal renewal link (?t=token), or after a
-// lookup with membership number + NIC. Shows the member's status and, where
-// relevant, a form to renew or upgrade with a payment slip.
+// lookup with the membership number. Shows the member's status and, where
+// relevant, a form to renew or upgrade with a payment slip. After a lookup the
+// contact details on record are only hinted at (anyone could type a number).
 document.addEventListener('DOMContentLoaded', async () => {
   const MS = SLICNA_MEMBERSHIP;
   const esc = SLICNA.escapeHtml;
@@ -21,6 +22,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     deactivated: () => 'Your membership is not active. Please contact SLICNA on 077 353 6178 or slicna2022@gmail.com.',
   };
 
+  // While a renewal or upgrade waits for verification, the card says so instead of "renew now".
+  const pendingRequest = (v) => v.latest_request && v.latest_request.status === 'pending';
+  const PENDING_TEXT = 'Your payment has been received and is waiting for verification. Your membership will be updated once it is verified.';
+
   function memberCard(v) {
     const m = v.member;
     return `
@@ -33,8 +38,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
           <span class="status-chip status-${esc(m.state)}">${esc(m.state_label)}</span>
         </div>
-        <p style="margin:14px 0 0">${esc(STATE_TEXT[m.state](m))}</p>
+        <p style="margin:14px 0 0">${esc(pendingRequest(v) ? PENDING_TEXT : STATE_TEXT[m.state](m))}</p>
       </div>`;
+  }
+
+  // "Email on record: in•••@gmail.com · Mobile on record: 071•••••68."
+  function onRecord(m) {
+    const parts = [m.email_hint && `Email on record: ${esc(m.email_hint)}`, m.mobile_hint && `Mobile on record: ${esc(m.mobile_hint)}`].filter(Boolean);
+    return parts.length ? `${parts.join(' · ')}.` : 'We have no email or mobile on record for you.';
   }
 
   function render(v) {
@@ -58,16 +69,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       html += `<div class="callout callout-error" style="margin-bottom:20px"><strong>Your last payment could not be verified.</strong>${latest.status_note ? `<p style="margin:6px 0 0">${esc(latest.status_note)}</p>` : ''}<p style="margin:6px 0 0">Please submit it again below.</p></div>`;
     }
 
+    // Renew, or upgrade to any category open to this member ("upgrade:GM"); each
+    // option carries its own fee.
+    const UPGRADE_META = {
+      LT: () => 'Pay once, never renew. Requires a PBCN ICU qualification or 10+ years in ICU.',
+      GM: (u) => `For nurses working in a government hospital ICU. New GM number, valid until ${fmt(u.new_valid_until)}.`,
+      OM: (u) => `For nurses at any government hospital. New OM number, valid until ${fmt(u.new_valid_until)}.`,
+    };
+    const amounts = { renewal: v.renewal.amount, ...Object.fromEntries(v.upgrades.map((u) => [`upgrade:${u.to_category}`, u.amount])) };
     html += `
       <form class="form-card" id="renew-form" novalidate>
         <h2 style="font-size:24px">Choose an option</h2>
         <div class="choice-grid">
-          <label class="choice"><input type="radio" name="kind" value="renewal" checked>
+          <label class="choice"><input type="radio" name="option" value="renewal" checked>
             <span class="choice-box"><span class="choice-price">${esc(MS.money(v.renewal.amount))}</span><b>Renew for 12 months</b>
             <span class="choice-meta">Valid until ${esc(fmt(v.renewal.new_valid_until))}</span></span></label>
-          <label class="choice"><input type="radio" name="kind" value="upgrade">
-            <span class="choice-box"><span class="choice-price">${esc(MS.money(v.upgrade.amount))}</span><b>Upgrade to Lifetime</b>
-            <span class="choice-meta">Pay once, never renew. Requires a PBCN ICU qualification or 10+ years in ICU.</span></span></label>
+          ${v.upgrades.map((u) => `
+          <label class="choice"><input type="radio" name="option" value="upgrade:${esc(u.to_category)}">
+            <span class="choice-box"><span class="choice-price">${esc(MS.money(u.amount))}</span><b>Upgrade to ${esc(u.label.replace(' Membership', ''))}</b>
+            <span class="choice-meta">${esc((UPGRADE_META[u.to_category] || (() => ''))(u))}</span></span></label>`).join('')}
         </div>
 
         <div class="upgrade-req" id="upgrade-req" hidden>
@@ -86,7 +106,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         <p class="muted">Pay by bank transfer or deposit, then upload the slip or a screenshot below.</p>
         ${MS.bankBox(v.bank)}
 
-        <h3 style="font-size:20px;margin-top:26px">2. Check your contact details</h3>
+        <h3 style="font-size:20px;margin-top:26px">2. ${v.member.contact_hidden ? 'Update your contact details (if they changed)' : 'Check your contact details'}</h3>
+        ${v.member.contact_hidden ? `<p class="muted">${onRecord(v.member)} Leave these empty to keep what we have.</p>` : ''}
         <div class="form-grid">
           <div class="field"><label for="r-email">Email</label><input id="r-email" name="email" type="email" maxlength="255" value="${esc(v.member.email)}"></div>
           <div class="field"><label for="r-mobile">Mobile</label><input id="r-mobile" name="mobile" type="tel" maxlength="13" placeholder="07XXXXXXXX" value="${esc(v.member.mobile)}"></div>
@@ -95,8 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         <h3 style="font-size:20px;margin-top:26px">3. Upload your payment slip</h3>
         <div class="form-grid">
-          <div class="field"><label for="r-date">Date you paid</label><input id="r-date" name="payment_date" type="date" required></div>
-          <div class="field"><label for="r-nic">NIC number</label><input id="r-nic" name="nic_number" required maxlength="12" autocomplete="off"><p class="hint">To confirm it's you. Old or new format.</p></div>
+          <div class="field"><label for="r-date">Date you paid</label><input id="r-date" name="payment_date" type="date" required value="${esc(MS.today())}"></div>
           <div class="field full"><label for="r-receipt">Payment slip or screenshot</label>
             <div class="file-field"><div class="file-preview">No file</div><div><input type="file" id="r-receipt" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" required><p class="hint">JPG / PNG / PDF, up to 10MB.</p></div></div></div>
         </div>
@@ -109,12 +129,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     MS.bindFilePreview(form.receipt);
     const upgradeReq = document.getElementById('upgrade-req');
     const upgradeInputs = [form.icu_training_batch, form.icu_training_type, form.icu_training_year];
+    // The PBCN ICU details are asked only for an upgrade to Lifetime.
     form.addEventListener('change', (e) => {
-      if (e.target.name === 'kind') {
-        const upgrading = e.target.value === 'upgrade';
-        document.getElementById('amount-due').textContent = MS.money(upgrading ? v.upgrade.amount : v.renewal.amount);
-        upgradeReq.hidden = !upgrading;
-        upgradeInputs.forEach((el) => { el.required = upgrading; });
+      if (e.target.name === 'option') {
+        const toLifetime = e.target.value === 'upgrade:LT';
+        document.getElementById('amount-due').textContent = MS.money(amounts[e.target.value]);
+        upgradeReq.hidden = !toLifetime;
+        upgradeInputs.forEach((el) => { el.required = toLifetime; });
       }
     });
     form.addEventListener('submit', async (e) => {
@@ -128,7 +149,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         FE.setFieldError(input, msg);
         FE.focusOn(input);
       };
-      if (form.kind.value === 'upgrade') {
+      const option = form.option.value;
+      if (option === 'upgrade:LT') {
         const empty = upgradeInputs.find((el) => !el.value.trim());
         if (empty) return fail(empty, 'This is required for Lifetime Membership.');
         const year = Number(form.icu_training_year.value);
@@ -137,7 +159,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       form.mobile.value = form.mobile.value.replace(/[\s-]/g, '');
       if (form.mobile.value && !/^(?:\+94|0)7[0-8][0-9]{7}$/.test(form.mobile.value)) return fail(form.mobile, 'Enter a mobile number like 07XXXXXXXX or +947XXXXXXXX.');
       if (!form.payment_date.value) return fail(form.payment_date, 'Please enter the date you paid.');
-      if (!/^(\d{9}[VvXx]|\d{12})$/.test(form.nic_number.value.replace(/\s/g, ''))) return fail(form.nic_number, 'Enter your NIC: 12 digits, or 9 digits followed by V or X.');
       if (!form.receipt.files.length) return fail(form.receipt, 'Please upload your payment slip or screenshot.');
       const problem = MS.fileProblem(form.receipt, { pdf: true });
       if (problem) return fail(form.receipt, problem);
@@ -146,8 +167,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       button.disabled = true;
       button.textContent = 'Submitting…';
       try {
-        const result = await SLICNA_API.submitRenewal(token, new FormData(form));
-        host.innerHTML = memberCard(v) + `
+        // "upgrade:GM" is sent as kind = upgrade, to_category = GM.
+        const data = new FormData(form);
+        data.delete('option');
+        data.set('kind', option === 'renewal' ? 'renewal' : 'upgrade');
+        if (option !== 'renewal') data.set('to_category', option.slice(8));
+        if (option !== 'upgrade:LT') ['icu_training_batch', 'icu_training_type', 'icu_training_year'].forEach((k) => data.delete(k));
+        const result = await SLICNA_API.submitRenewal(token, data);
+        host.innerHTML = memberCard({ ...v, latest_request: { status: 'pending' } }) + `
           <div class="form-card success-panel">
             <div class="tick" aria-hidden="true">✓</div>
             <h2>Thank you</h2>
@@ -177,17 +204,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   lookupForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const number = document.getElementById('lookup-number').value.trim();
-    const nic = document.getElementById('lookup-nic').value.trim();
     lookupError.className = 'form-status';
-    if (!number || !nic) {
+    if (!number) {
       lookupError.className = 'form-status is-error';
-      lookupError.textContent = 'Please enter your membership number and NIC.';
+      lookupError.textContent = 'Please enter your membership number.';
       return;
     }
     const button = lookupForm.querySelector('[type="submit"]');
     button.disabled = true;
     try {
-      token = (await SLICNA_API.renewalLookup(number, nic)).token;
+      token = (await SLICNA_API.renewalLookup(number)).token;
       await load();
     } catch (err) {
       lookupError.className = 'form-status is-error';
