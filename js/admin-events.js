@@ -28,6 +28,11 @@
   const chipClass = (e) => (e.is_past ? 'rejected' : e.status === 'open' ? 'approved' : e.status === 'closed' ? 'rejected' : 'pending');
   const ongoingChip = (e) => (e.is_ongoing ? ' <span class="status-chip status-ongoing">Ongoing</span>' : '');
   const eventChip = (e) => chip(chipClass(e), e.status_label) + ongoingChip(e);
+  // Seats: pending and confirmed registrations take a seat (rejected ones don't).
+  const hasSeats = (e) => e.category === 'cpd' && (e.registration_mode || 'online') === 'online' && Number(e.seat_limit) > 0;
+  const seatsTaken = (e) => (e.registrations_pending || 0) + (e.registrations_confirmed || 0);
+  const seatsFilled = (e) => hasSeats(e) && e.seats_closed && !e.is_past;
+  const seatsText = (e) => `${seatsTaken(e)} / ${e.seat_limit} seats`;
   // Short statuses for the Events table, without the word "Registration".
   const SHORT_STATUS = {
     cpd: { coming_soon: 'Coming Soon', opening_soon: 'Opening Soon', open: 'Open', closed: 'Closed' },
@@ -198,6 +203,12 @@
         <input id="f-join_url" type="url" name="join_url" maxlength="500" placeholder="https://zoom.us/j/…" value="${esc(v.join_url || '')}">
         <p class="hint">Zoom, Teams or Google Meet. The event page shows a "Join the meeting" button until the event ends. You can add it later.</p>
       </div>
+      <div class="field full seat-field" data-cpd-only data-reg="online">
+        <label for="f-seat_limit">Number of seats <span class="opt">(optional)</span></label>
+        <input id="f-seat_limit" type="number" name="seat_limit" min="1" step="1" inputmode="numeric" placeholder="No limit" value="${esc(v.seat_limit ?? '')}">
+        <label class="consent"><input type="checkbox" name="seat_hard_stop" value="true"${v.seat_hard_stop ? ' checked' : ''}> Close registration automatically when all seats are taken</label>
+        <p class="hint">Pending and confirmed registrations take a seat. You're emailed at 80%, 95% and 100% of the seats either way. When registration closes automatically, visitors see that the seats are filled, and you can reopen it with "Add seats" in the Events list.</p>
+      </div>
       <div class="field full" data-cpd-only data-reg-needed>
         <span class="field-label" id="aud-label">Audience</span>
         <div class="seg" role="radiogroup" aria-labelledby="aud-label">
@@ -327,6 +338,9 @@
       }[mode];
       syncTime();
       syncDuration();
+      const hardStop = form.elements.seat_hard_stop;
+      hardStop.disabled = !form.elements.seat_limit.value;
+      if (hardStop.disabled) hardStop.checked = false;
 
       const paid = val('fee_type') === 'paid';
       const pricing = val('member_pricing');
@@ -373,6 +387,7 @@
     if (values.status) statusSelect.value = values.status;
     form.addEventListener('change', sync);
     form.addEventListener('input', (e) => { if (e.target.type === 'number' || e.target.type === 'date') sync(); });
+    form.elements.seat_limit.addEventListener('input', sync);
   }
 
   function validateEventForm(form) {
@@ -423,8 +438,8 @@
       { label: 'CPD', cpdOnly: true, html: (r) => (r.category === 'cpd' && r.cpd_points != null ? `${esc(Number(r.cpd_points))}<span class="admin-muted"> pts</span>` : '<span class="admin-muted">—</span>') },
       { label: 'Audience', cpdOnly: true, html: (r) => (r.category === 'cpd' ? esc(AUDIENCE_SHORT[r.audience] || r.audience) : '<span class="admin-muted">—</span>') },
       { label: 'Fee', cpdOnly: true, html: (r) => (r.category === 'cpd' ? `<span class="admin-muted fee-text" title="${esc(feeTitle(r))}">${esc(feeText(r))}</span>${(r.foreign || []).length ? `<div class="admin-muted" title="${esc(feeTitle(r))}">+ foreign</div>` : ''}` : '<span class="admin-muted">—</span>') },
-      { label: 'Status / Registrations', html: (r) => `<div class="status-reg">${shortChip(r)}${regMode(r) === 'online'
-        ? `<div class="admin-muted">${r.registrations_total} registration${r.registrations_total === 1 ? '' : 's'}</div>`
+      { label: 'Status / Registrations', html: (r) => `<div class="status-reg">${seatsFilled(r) ? chip('rejected', 'Seats Filled') : shortChip(r)}${regMode(r) === 'online'
+        ? `<div class="admin-muted">${r.registrations_total} registration${r.registrations_total === 1 ? '' : 's'}</div>${hasSeats(r) ? `<div class="admin-muted${seatsTaken(r) >= r.seat_limit ? ' seats-full' : ''}" title="${r.seat_hard_stop ? 'Closes automatically when full' : 'Stays open when full'}">${esc(seatsText(r))}</div>${r.seat_hard_stop ? `<div class="admin-muted${seatsTaken(r) >= r.seat_limit ? ' seats-full' : ''}">auto-close</div>` : ''}` : ''}`
         : regMode(r) === 'external' ? '<div class="admin-muted">Registers elsewhere</div>' : ''}</div>` },
     ];
 
@@ -457,12 +472,57 @@
       deleteNote: 'Events that already have registrations cannot be deleted',
       // One-click registration switch for upcoming CPD events: Opening Soon -> Open -> Closed.
       belowActions: [{
+        // Closed because the seats were filled: reopen with more seats.
+        show: (r) => seatsFilled(r) && r.status === 'open',
+        label: 'Add seats',
+        cls: 'btn-teal',
+        onClick: (r, reload) => addSeats(r, reload),
+      }, {
         show: (r) => regMode(r) === 'online' && !r.is_past && (r.status === 'opening_soon' || r.status === 'open'),
         label: (r) => (r.status === 'open' ? 'Close Registration' : 'Open Registration'),
         cls: (r) => (r.status === 'open' ? 'btn-soft-danger' : 'btn-teal'),
         onClick: (r, reload) => switchRegistration(r, reload),
       }],
     });
+
+    // Reopens an event closed because its seats were filled: add 10 / 20 / 50 or any
+    // number of seats, and choose whether it closes again at the new number.
+    async function addSeats(r, reload) {
+      const taken = seatsTaken(r);
+      const ok = await openForm({
+        title: `Add seats · ${r.title}`,
+        fields: [
+          { type: 'html', html: () => `<div class="field full"><p class="seat-now"><b>${taken}</b> of <b>${r.seat_limit}</b> seats taken (pending and confirmed). Registration closed automatically when they were filled.</p></div>` },
+          { name: 'add', label: 'Seats to add', type: 'number', min: 0, required: true, half: true },
+          { type: 'html', html: () => `<div class="field seat-quick"><span class="field-label">Quick add</span><div>${[10, 20, 50].map((n) => `<button type="button" class="btn btn-light btn-xs" data-seats="${n}">+${n}</button>`).join('')}</div></div>` },
+          { type: 'html', html: () => `<div class="field full"><label class="consent"><input type="checkbox" name="hard_stop" value="true" checked> Close again automatically when the new number is reached</label><p class="hint" data-seat-preview></p></div>` },
+        ],
+        values: { add: 10 },
+        saveLabel: 'Reopen registration',
+        confirmTitle: 'Reopen registration?',
+        confirmMessage: `"${r.title}" will show "Registration Open" again and people can register straight away.`,
+        onMount: (form) => {
+          const preview = () => {
+            const add = Math.max(0, Number(form.elements.add.value) || 0);
+            const limit = Number(r.seat_limit) + add;
+            form.querySelector('[data-seat-preview]').textContent = form.elements.hard_stop.checked
+              ? `New number of seats: ${limit}. ${Math.max(0, limit - taken)} more can register before it closes again.`
+              : `New number of seats: ${limit}. Registration stays open after that until you close it (you're still emailed at 80%, 95% and 100%).`;
+          };
+          form.querySelectorAll('[data-seats]').forEach((b) => b.addEventListener('click', () => { form.elements.add.value = b.dataset.seats; preview(); }));
+          form.addEventListener('input', preview);
+          form.addEventListener('change', preview);
+          preview();
+        },
+        validate: (form) => {
+          const add = Number(form.elements.add.value) || 0;
+          if (form.elements.hard_stop.checked && Number(r.seat_limit) + add <= taken) return `${taken} seats are taken: add at least ${taken - Number(r.seat_limit) + 1}, or untick "Close again automatically".`;
+          return null;
+        },
+        submit: (fd) => api('POST', `${BASE}/events/${r.id}/seats`, fd),
+      });
+      if (ok) { toast('Registration is open again.'); reload(); }
+    }
 
     async function switchRegistration(r, reload) {
       const opening = r.status !== 'open';
@@ -579,6 +639,7 @@
       <div class="reg-event-summary">
         <p>${facts} ${eventChip(event)}</p>
         <p>Event fee: ${fees}${foreign}</p>
+        ${hasSeats(event) ? `<p>Seats: <b>${esc(seatsText(event))}</b>${seatsFilled(event) ? ' · registration closed automatically (full)' : event.seat_hard_stop ? ' · closes automatically when full' : ''}</p>` : ''}
       </div>
       <div data-filters></div>
       <div data-list></div>`;
@@ -607,7 +668,7 @@
         const rows = await api('GET', `${BASE}/registrations${query({ status: filters.status, event_id: event.id, q: filters.q })}`);
         updateCounts();
         listEl.innerHTML = rows.length ? `
-          <div class="admin-table-wrap"><table class="admin-table">
+          <div class="admin-table-wrap"><table class="admin-table reg-list">
             <thead><tr><th>Registrant</th><th>NIC / Passport · Email</th><th>Registered as</th><th>Fee</th><th>Paid by</th><th>Slip</th><th>Status</th></tr></thead>
             <tbody>${rows.map((r) => `
               <tr class="is-clickable" data-id="${r.id}" tabindex="0">

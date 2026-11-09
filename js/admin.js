@@ -1053,12 +1053,15 @@
   // Returns the live filter state; onChange(state) runs after every change.
   function filterBar(host, { chips, chipKey, selects = [], search = true, onChange, actions = '' }) {
     const state = { [chipKey]: chips[0][0] };
+    // With dropdowns: tabs on the first row, dropdowns and search on the second,
+    // so the dropdowns don't move when the tab counts change.
+    const two = selects.length > 0;
     host.innerHTML = `
-      <div class="admin-filters">
-        ${chips.map(([v, label], i) => `<button type="button" class="chip" data-chip="${esc(v)}" data-label="${esc(label)}" aria-pressed="${i === 0}">${esc(label)}</button>`).join('')}
+      <div class="admin-filters${two ? ' admin-filters-rows' : ''}">${two ? '<div class="filter-row">' : ''}
+        ${chips.map(([v, label], i) => `<button type="button" class="chip" data-chip="${esc(v)}" data-label="${esc(label)}" aria-pressed="${i === 0}">${esc(label)}</button>`).join('')}${two ? '</div><div class="filter-row">' : ''}
         ${selects.map((s) => `<select data-select="${s.key}" aria-label="${esc(s.label)}"><option value="">${esc(s.label)}: all</option>${s.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>`).join('')}
         ${search ? '<input type="search" data-search placeholder="Search name, NIC, number…" aria-label="Search">' : ''}
-        ${actions}
+        ${actions}${two ? '</div>' : ''}
       </div>`;
     let timer = null;
     host.addEventListener('click', (e) => {

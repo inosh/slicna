@@ -183,8 +183,9 @@
 .row-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 .admin-table .row-actions { flex-wrap: nowrap; }
 /* Extra row buttons under Edit / Delete, as wide as that pair. */
-.row-actions-below { display: flex; gap: 6px; margin-top: 6px; }
-.row-actions-below .btn { flex: 1; }
+/* Extra row buttons (Open / Close Registration, Add seats): one per line under Edit / Delete, so the column stays narrow. */
+.row-actions-below { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.row-actions-below .btn { width: 100%; white-space: nowrap; }
 .btn-sky { background: #e3edfb; border-color: #e3edfb; color: #1f4f8f; }
 .btn-sky:hover { border-color: #1f4f8f; }
 /* File downloads in their usual colours: Excel green, PDF red. */
@@ -314,3 +315,17 @@
 .image-preview .media-thumb { width: 100%; height: 100%; }
 .admin-thumb.media-thumb { overflow: hidden; }
 .admin-thumb.media-thumb .media-play { font-size: 14px; }
+/* Seats: event form, Events table and the Add seats window. */
+.seat-field input[type="number"] { max-width: 180px; }
+.seat-field .consent { margin-top: 10px; }
+.status-reg .seats-full { color: var(--coral-deep, #b4412b); font-weight: 700; }
+.seat-now { margin: 0; }
+.seat-quick > div { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 6px; }
+/* Registrations window: the registrant column takes only what it needs; the other columns stay on one line. */
+.reg-list .main-col { width: auto; min-width: 160px; }
+.reg-list td:not(.main-col) { white-space: nowrap; }
+/* Members from the old records. */
+.legacy-chip { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: #e6eaeb; color: var(--ink-2); font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: 1px; }
+/* Filter bars with dropdowns: tabs on one row, dropdowns and search on the next, so they stay put when tab counts change. */
+.admin-filters.admin-filters-rows { flex-direction: column; align-items: stretch; }
+.admin-filters .filter-row { display: flex; flex-wrap: wrap; gap: inherit; align-items: center; }

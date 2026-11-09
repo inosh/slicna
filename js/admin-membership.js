@@ -341,6 +341,30 @@
     { name: 'admin_notes', label: 'Internal notes', type: 'textarea', rows: 2 },
   ];
 
+  // Legacy members (from the old records): number, name, year joined and valid until; the rest if known.
+  const LEGACY_FIELDS = [
+    { name: 'category', label: 'Category', type: 'select', required: true, half: true, options: CATEGORY_OPTIONS },
+    { name: 'membership_number', label: 'Membership number', required: true, half: true, hint: 'As on the card: GM/001/2023 is saved as GM 0001/23.' },
+    { name: 'full_name', label: 'Name', required: true, hint: 'As in the old records, for example M. G. I. MADUSHIKA.' },
+    { name: 'name_with_initials', label: 'Name with initials', half: true, hint: 'Leave empty to work it out from the name.' },
+    { name: 'joined_year', label: 'Member since (year)', type: 'number', min: 1990, required: true, half: true },
+    { name: 'valid_until', label: 'Valid until', type: 'date', half: true, hint: 'Ignored for Lifetime. If empty: 31 December this year.' },
+    { name: 'nic_number', label: 'NIC number', half: true, hint: 'Optional' },
+    { name: 'mobile', label: 'Mobile', half: true, hint: 'Optional. 07XXXXXXXX' },
+    { name: 'email', label: 'Email', half: true, hint: 'Optional' },
+    { name: 'admin_notes', label: 'Internal notes', type: 'textarea', rows: 2 },
+  ];
+  const isLegacy = (m) => m.source === 'legacy';
+  const legacyChip = (m) => (isLegacy(m) ? ' <span class="legacy-chip" title="From the old records: some details may be missing">Legacy</span>' : '');
+  // Under the name: NIC and mobile, or what's missing for a legacy member.
+  const memberSub = (m) => {
+    const bits = [m.nic_number, m.mobile].filter(Boolean).map(esc);
+    if (bits.length) return bits.join(' · ');
+    return isLegacy(m) ? 'No NIC or contact details yet' : '';
+  };
+  // Legacy members joined "in 2023" (the day isn't known).
+  const memberSince = (m) => (isLegacy(m) ? String(m.joined_on).slice(0, 4) : fmtDate(m.joined_on));
+
   async function suggestionsHint() {
     try {
       const nums = await Promise.all(Object.keys(CATEGORIES).map((c) => api('GET', `${BASE}/next-number?category=${c}`)));
@@ -359,6 +383,7 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button type="button" class="btn btn-sky btn-sm" data-refresh>Refresh</button>
           <button type="button" class="btn btn-excel btn-sm" data-export>Download Excel</button>
+          <button type="button" class="btn btn-coral btn-sm" data-add-legacy>Add legacy member</button>
           <button type="button" class="btn btn-coral btn-sm" data-add>Add member</button>
         </div></div>
       <div class="stat-tiles" data-tiles></div>
@@ -370,7 +395,10 @@
       chipKey: 'state',
       // "Members" is everyone who isn't deactivated (active, renewal due, grace period and lapsed).
       chips: [['current', 'Members'], ['renewal_due', 'Renewal Due'], ['grace', 'Grace Period'], ['lapsed', 'Lapsed'], ['pending_renewal', 'Renewals to Verify'], ['deactivated', 'Deactivated']],
-      selects: [{ key: 'category', label: 'Category', options: CATEGORY_OPTIONS }],
+      selects: [
+        { key: 'category', label: 'Category', options: CATEGORY_OPTIONS },
+        { key: 'record', label: 'Records', options: [['full', 'Newly added'], ['legacy', 'Legacy (old records)']] },
+      ],
       onChange: load,
     });
 
@@ -388,7 +416,7 @@
     // "Members (42)", "Lapsed (5)"…: counts follow the category and search filters.
     async function updateCounts() {
       try {
-        const counts = await api('GET', `${BASE}/members/counts${query({ category: filters.category, q: filters.q })}`);
+        const counts = await api('GET', `${BASE}/members/counts${query({ category: filters.category, record: filters.record, q: filters.q })}`);
         card.querySelectorAll('[data-chip]').forEach((c) => { c.textContent = `${c.dataset.label} (${counts[c.dataset.chip] || 0})`; });
       } catch (err) { /* keep the plain labels */ }
     }
@@ -415,7 +443,7 @@
     async function load() {
       listEl.innerHTML = '<p class="admin-muted">Loading…</p>';
       try {
-        rows = await api('GET', `${BASE}/members${query({ state: filters.state, category: filters.category, q: filters.q })}`);
+        rows = await api('GET', `${BASE}/members${query({ state: filters.state, category: filters.category, record: filters.record, q: filters.q })}`);
         updateCounts();
         listEl.innerHTML = rows.length ? `
           <p class="admin-muted">${rows.length} member${rows.length === 1 ? '' : 's'}</p>
@@ -424,7 +452,7 @@
             <tbody>${rows.map((m) => `
               <tr class="is-clickable" data-id="${m.id}" tabindex="0">
                 <td style="white-space:nowrap">${esc(m.membership_number)}</td>
-                <td class="main-col">${esc(m.name_with_initials)}<div class="admin-muted">${esc(m.nic_number)}${m.mobile ? ' · ' + esc(m.mobile) : ''}</div></td>
+                <td class="main-col">${esc(m.name_with_initials)}${legacyChip(m)}<div class="admin-muted">${memberSub(m)}</div></td>
                 <td>${esc(CATEGORIES[m.category])}</td>
                 <td>${m.valid_until ? esc(fmtDate(m.valid_until)) : 'Lifetime'}</td>
                 <td>${chip(m.state, MEMBER_STATE[m.state])}${m.has_pending_renewal ? '<div class="admin-muted" style="margin-top:4px;white-space:nowrap">Renewal to verify</div>' : ''}</td>
@@ -462,7 +490,21 @@
     // The list as currently filtered, as an Excel file (named by the server).
     card.querySelector('[data-refresh]').onclick = reload;
     card.querySelector('[data-export]').onclick = () =>
-      A.downloadPrivateFile(`${BASE}/members/export.xlsx${query({ state: filters.state, category: filters.category, q: filters.q })}`);
+      A.downloadPrivateFile(`${BASE}/members/export.xlsx${query({ state: filters.state, category: filters.category, record: filters.record, q: filters.q })}`);
+
+    card.querySelector('[data-add-legacy]').onclick = async () => {
+      const hint = await suggestionsHint();
+      const ok = await openForm({
+        title: 'Add legacy member',
+        fields: LEGACY_FIELDS.map((f) => (f.name === 'membership_number' ? { ...f, hint: `${f.hint} ${hint}` } : f)),
+        values: { category: 'GM', joined_year: new Date().getFullYear() },
+        saveLabel: 'Add legacy member',
+        confirmTitle: 'Add this legacy member?',
+        confirmMessage: 'For members from the old records. Add their NIC and contact details later with "Edit details"; a renewal also fills in their email and mobile.',
+        submit: (fd) => api('POST', `${BASE}/members/legacy`, fd),
+      });
+      if (ok) { toast('Legacy member added.'); reload(); }
+    };
 
     card.querySelector('[data-add]').onclick = async () => {
       const hint = await suggestionsHint();
@@ -586,7 +628,10 @@
   function deactivateMember(m) {
     return openForm({
       title: `Deactivate ${m.membership_number}`,
-      fields: [{ name: 'reason', label: 'Reason', type: 'textarea', required: true, rows: 3, hint: 'Internal: for example "Resigned" or "Duplicate record".' }],
+      fields: [
+        { name: 'reason', label: 'Reason', type: 'textarea', required: true, rows: 3, hint: 'Internal: for example "Resigned" or "Duplicate record". Sent to the secretary, not to the member.' },
+        { type: 'html', html: () => `<div class="field full"><label class="consent"><input type="checkbox" name="notify_member" value="true"${m.email ? ' checked' : ' disabled'}> Email the member that their membership is now inactive</label>${m.email ? '<p class="hint">Untick for duplicates or records entered by mistake.</p>' : '<p class="hint">No email address on record.</p>'}</div>` },
+      ],
       saveLabel: 'Deactivate',
       confirmTitle: 'Deactivate this member?',
       confirmMessage: `${m.membership_number} (${m.name_with_initials}) will be marked inactive and stop receiving reminders. The record is kept and can be reactivated.`,
@@ -626,10 +671,10 @@
           <div class="detail-section"><h3>Membership</h3>${dl([
             ['Number', m.membership_number], ['Category', `${CATEGORIES[m.category]} (${m.category})`],
             ['Status', html(chip(m.state, MEMBER_STATE[m.state]) + (m.has_pending_renewal ? ' <span class="admin-muted">Renewal to verify</span>' : ''))],
-            ['Member since', fmtDate(m.joined_on)], ['Valid until', m.valid_until ? fmtDate(m.valid_until) : 'Lifetime'],
+            ['Member since', memberSince(m)], ['Valid until', m.valid_until ? fmtDate(m.valid_until) : 'Lifetime'],
             ['Grace period ends', m.grace_ends ? fmtDate(m.grace_ends) : ''],
             ['Deactivated', m.deactivated_at ? `${fmtDate(m.deactivated_at)}: ${m.deactivated_reason}` : ''],
-            ['Joined through', m.source === 'manual' ? 'Added by an admin' : m.application ? `Application ${m.application.reference_number}` : 'Application'],
+            ['Joined through', isLegacy(m) ? 'Old records (legacy)' : m.source === 'manual' ? 'Added by an admin' : m.application ? `Application ${m.application.reference_number}` : 'Application'],
             ['Previous number', (m.previous_numbers || []).map((p) => `${p.membership_number} (until ${fmtDate(p.retired_at)}, then upgraded; reserved)`).join(', ')],
           ])}</div>
           <div class="detail-section"><h3>Details</h3>${dl([
@@ -673,7 +718,7 @@
       if (act === 'edit') {
         const ok = await openForm({
           title: 'Edit member',
-          fields: MEMBER_FIELDS,
+          fields: isLegacy(m) ? MEMBER_FIELDS.map((f) => (f.name === 'nic_number' ? { ...f, required: false, hint: 'Optional for legacy members' } : f)) : MEMBER_FIELDS,
           image: { column: 'photo_preview', field: 'photo', label: 'Photo', allowRemove: false },
           values: { ...m, photo_preview: photoUrl },
           saveLabel: 'Save changes',

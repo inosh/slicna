@@ -61,7 +61,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   renderSummary();
   if (!event.registration_open) {
-    showClosed(event.is_past ? 'This event has ended.' : `${event.status_label || 'Registration is closed'}. Please check back later.`);
+    showClosed(event.is_past ? 'This event has ended.'
+      : event.seats_full ? 'All seats have been filled, so registration is closed for now. More places may open later, so please check back.'
+        : `${event.status_label || 'Registration is closed'}. Please check back later.`);
     return;
   }
   form.hidden = false;
@@ -170,7 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // checked by SLICNA.
   $('check-btn').addEventListener('click', async () => {
     const number = $('membership_number').value.trim();
-    if (!/^(LT|GM|OM|PM)\s*\d{1,4}\s*(\/\s*\d{2})?$/i.test(number)) {
+    if (!/^(LT|GM|OM|PM)\s*[/-]?\s*\d{1,4}\s*([/-]\s*(\d{2}|\d{4}))?$/i.test(number)) {
       return memberResult('Enter your membership number like GM 0012/25: LT, GM, OM or PM and the number. The year is optional.', false);
     }
     const btn = $('check-btn');

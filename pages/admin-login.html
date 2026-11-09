@@ -16,11 +16,12 @@
 <div id="site-header"></div>
 
 <main id="main">
-  <section class="section">
+  <!-- Starts close to the menu, so the whole box (and any error under the button) fits on a laptop screen. -->
+  <section class="section login-section">
     <div class="wrap" style="max-width:480px">
-      <div class="form-card">
-        <img src="/images/slicna-logo.png" alt="" width="64" height="64" style="margin-bottom:12px">
-        <h1 style="font-size:32px">Staff login</h1>
+      <div class="form-card login-card">
+        <img src="/images/slicna-logo.png" alt="" width="52" height="52" style="margin-bottom:8px">
+        <h1 style="font-size:30px">Staff login</h1>
         <p class="muted">For SLICNA committee members who manage website content.</p>
         <form id="login-form" class="form-grid" novalidate>
           <div class="field full"><label for="l-username">Username</label><input id="l-username" name="username" required autocomplete="username"></div>
@@ -42,7 +43,12 @@
   document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('login-form');
     const status = document.getElementById('login-status');
-    const show = (kind, message) => { status.className = 'form-status ' + (kind === 'ok' ? 'is-ok' : 'is-error'); status.textContent = message; };
+    // Shows the message and brings it into view if it's below the fold.
+    const show = (kind, message) => {
+      status.className = 'form-status ' + (kind === 'ok' ? 'is-ok' : 'is-error');
+      status.textContent = message;
+      status.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
 
     if (sessionStorage.getItem('slicna_admin_token')) window.location.replace('/pages/admin.html');
     if (new URLSearchParams(location.search).has('expired')) show('error', 'Your session has expired. Please log in again.');

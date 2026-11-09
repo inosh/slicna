@@ -115,6 +115,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else if (isCpd && !event.is_past && event.registration_mode === 'external' && event.status === 'open' && event.registration_url) {
     reg.innerHTML = `<a class="btn btn-coral btn-block" href="${esc(event.registration_url)}" target="_blank" rel="noopener">Register now</a>
       <p class="muted register-note">Registration is on the organiser's form (opens in a new tab).</p>`;
+  } else if (isCpd && event.seats_full) {
+    // Closed automatically when the seats were filled; SLICNA may reopen it.
+    reg.innerHTML = `<p class="register-closed">${esc(event.status_label)}</p>
+      <p class="muted register-note">All seats have been filled, so registration is closed for now. More places may open later, so please check back.</p>`;
   } else if (isCpd) {
     const note = event.is_past ? 'This event has ended.' : event.status_label;
     reg.innerHTML = `<p class="register-closed">${esc(note)}</p>`;
