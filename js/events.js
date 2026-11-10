@@ -3,7 +3,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const esc = SLICNA.escapeHtml;
   const listEl = document.getElementById('events-list');
-  const countEl = document.getElementById('events-count');
   const params = new URLSearchParams(window.location.search);
   const state = { kind: ['cpd', 'other', 'all'].includes(params.get('kind')) ? params.get('kind') : 'cpd', when: params.get('when') === 'past' ? 'past' : 'upcoming' };
   document.querySelector(`[name="kind"][value="${state.kind}"]`).checked = true;
@@ -17,9 +16,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     list = list.filter((e) => (state.when === 'upcoming') === !e.is_past);
     if (state.when === 'past') list = [...list].reverse();
     const n = list.length;
-    countEl.textContent = n ? `${n} ${state.when} ${n === 1 ? KIND_WORDS[state.kind].replace(/s$/, '') : KIND_WORDS[state.kind]}` : '';
+    // A small month heading ("OCTOBER 2026") before each month's events, as on SLNA.
+    const monthOf = (e) => String(e.event_date || '').slice(0, 7);
+    const monthLabel = (e) => { const d = SLICNA.parseDate(e.event_date); return d ? d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : ''; };
     listEl.innerHTML = n
-      ? list.map(SLICNA.eventRow).join('')
+      ? list.map((e, i) => (monthOf(e) !== monthOf(list[i - 1] || {}) ? `<h3 class="events-month">${esc(monthLabel(e))}</h3>` : '') + SLICNA.eventRow(e)).join('')
       : `<p class="empty">${state.when === 'upcoming'
         ? `No upcoming ${KIND_WORDS[state.kind]} yet. New programmes are announced here and on our Facebook page.`
         : `No past ${KIND_WORDS[state.kind]}.`}</p>`;
