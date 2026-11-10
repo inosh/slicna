@@ -109,6 +109,28 @@ const SLICNA = (() => {
     return escapeHtml(SLICNA_API.mediaUrl(url));
   }
 
+  // CPD programmes grouped by year, newest year first:
+  //   [{ year, events (date order), points, count, intl }]
+  function cpdYears(events) {
+    const byYear = new Map();
+    events.filter((e) => e.category === 'cpd' && e.cpd_points != null && Number(e.cpd_points) > 0).forEach((e) => {
+      const y = parseDate(e.event_date)?.getFullYear();
+      if (!y) return;
+      if (!byYear.has(y)) byYear.set(y, []);
+      byYear.get(y).push(e);
+    });
+    return [...byYear.entries()].sort((a, b) => b[0] - a[0]).map(([year, list]) => {
+      const sorted = list.slice().sort((a, b) => String(a.event_date).localeCompare(String(b.event_date)));
+      return {
+        year,
+        events: sorted,
+        points: sorted.reduce((sum, e) => sum + Number(e.cpd_points), 0),
+        count: sorted.length,
+        intl: sorted.filter((e) => e.event_type === 'International Workshop').length,
+      };
+    });
+  }
+
   // A video file (news covers may be videos): MP4, WEBM, MOV or OGG.
   const isVideo = (url) => /\.(mp4|m4v|webm|mov|ogg|ogv)$/i.test(String(url || ''));
 
@@ -200,5 +222,5 @@ const SLICNA = (() => {
     document.querySelectorAll('[data-year]').forEach((el) => { el.textContent = new Date().getFullYear(); });
   });
 
-  return { escapeHtml, formatDate, parseDate, isUpcoming, formatPoints, formatMoney, typeTag, cpdTag, statusBadge, feeShort, eventRow, newsCard, paragraphs, richText, media, isVideo, coverHtml, CATEGORY_LABELS };
+  return { escapeHtml, formatDate, parseDate, isUpcoming, formatPoints, formatMoney, typeTag, cpdTag, statusBadge, feeShort, eventRow, newsCard, paragraphs, richText, media, isVideo, coverHtml, cpdYears, CATEGORY_LABELS };
 })();
