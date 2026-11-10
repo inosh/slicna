@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event Registration | SLICNA</title>
+  <meta name="description" content="Register for a SLICNA CPD event.">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="events">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="page-head" style="padding-bottom:24px">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / <a href="/pages/events.html">Events</a> / <a id="crumb-event" href="/pages/events.html">Event</a> / Register</nav>
+      <p class="eyebrow">Event registration</p>
+      <h1 id="reg-title" class="event-title">Loading…</h1>
+      <p class="lede" id="reg-lede"></p>
+    </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0">
+    <div class="wrap reg-layout">
+      <div class="event-main">
+        <div class="form-card" id="reg-closed" hidden></div>
+
+        <form class="form-card reg-form" id="reg-form" novalidate hidden>
+          <!-- 1. Member or not -->
+          <div class="reg-step">
+            <h2 class="form-legend" id="type-legend">Are you a SLICNA member?</h2>
+            <div class="choice-grid" id="type-choices">
+              <label class="choice"><input type="radio" name="registrant_type" value="member" required><span class="choice-box"><b>Yes, I'm a member</b><span class="choice-meta">Enter your membership number for the member fee.</span></span></label>
+              <label class="choice" id="non-member-choice"><input type="radio" name="registrant_type" value="non_member"><span class="choice-box"><b>No, I'm not a member</b><span class="choice-meta">Register at the non-member rate.</span></span></label>
+              <label class="choice" id="foreign-choice" hidden><input type="radio" name="registrant_type" value="foreign"><span class="choice-box"><b>I'm a foreign participant</b><span class="choice-meta" id="foreign-meta">From outside Sri Lanka.</span></span></label>
+            </div>
+            <p class="muted members-only-note" id="members-only-note" hidden>This event is for SLICNA members only. Not a member yet? <a href="/pages/membership.html">Join SLICNA</a>.</p>
+
+            <div class="member-check" id="member-check" hidden>
+              <div class="form-grid">
+                <div class="field"><label for="membership_number">Membership number</label><input id="membership_number" name="membership_number" placeholder="e.g. GM 0012/25" autocomplete="off"><p class="hint">As on your membership card. The year is optional: GM 0012 works too.</p></div>
+                <div class="field member-check-btn"><button type="button" class="btn btn-teal" id="check-btn">Check my membership</button></div>
+              </div>
+              <div class="member-result" id="member-result" role="status" hidden></div>
+            </div>
+
+            <!-- Foreign participants: online or physical -->
+            <div class="foreign-attend" id="foreign-attend" hidden>
+              <span class="field-label" id="attend-label">How will you attend?</span>
+              <div class="choice-grid" role="radiogroup" aria-labelledby="attend-label" id="attend-choices"></div>
+            </div>
+          </div>
+
+          <!-- 2. Details -->
+          <div class="reg-step" id="details-step" hidden>
+            <h2 class="form-legend">Your details</h2>
+            <div class="form-grid">
+              <div class="field full"><label for="full_name">Full name</label><input id="full_name" name="full_name" required autocomplete="name"></div>
+              <div class="field full">
+                <label for="certificate_name">Name on the certificate</label>
+                <input id="certificate_name" name="certificate_name" required>
+                <label class="consent cert-same"><input type="checkbox" id="cert-same" checked> Same as my full name</label>
+                <p class="hint">Your CPD certificate is printed exactly like this, for example "Mrs. A. M. Perera".</p>
+              </div>
+              <div class="field" id="nic-field"><label for="nic_number" id="nic-label">NIC number</label><input id="nic_number" name="nic_number" required maxlength="12" data-nic></div>
+              <div class="field" id="country-field" hidden><label for="country">Country</label><input id="country" name="country" maxlength="100" autocomplete="country-name"></div>
+              <div class="field"><label for="slnc_number" id="slnc-label">SLNC registration number <span class="opt">(optional)</span></label><input id="slnc_number" name="slnc_number"></div>
+              <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" required autocomplete="email"><p class="hint">We send your confirmation here.</p></div>
+              <div class="field"><label for="mobile">Mobile number</label><input id="mobile" name="mobile" type="tel" required autocomplete="tel" placeholder="07XXXXXXXX" data-phone="mobile"></div>
+              <div class="field full"><label for="postal_address">Postal address</label><textarea id="postal_address" name="postal_address" rows="2" required autocomplete="street-address"></textarea></div>
+              <div class="field"><label for="workplace">Workplace</label><input id="workplace" name="workplace" required placeholder="Hospital and unit, e.g. NHSL, ICU 2"></div>
+              <div class="field"><label for="workplace_address">Workplace address</label><input id="workplace_address" name="workplace_address" required></div>
+            </div>
+          </div>
+
+          <!-- 3. Payment -->
+          <div class="reg-step" id="payment-step" hidden>
+            <h2 class="form-legend">Payment</h2>
+            <div id="payment-free" hidden><p class="fee-free-note">No payment is needed for you. Just submit your registration.</p></div>
+            <div id="payment-paid" hidden>
+              <p class="amount-row">Your fee <span class="amount-due" id="amount-due"></span></p>
+              <p class="muted" id="pay-how">Pay by bank transfer or deposit, then upload the slip or a screenshot below.</p>
+              <div id="bank-details"></div>
+              <div class="form-grid" style="margin-top:20px">
+                <div class="field full">
+                  <span class="field-label" id="payby-label">Paid by</span>
+                  <div class="seg" role="radiogroup" aria-labelledby="payby-label">
+                    <label><input type="radio" name="pay_by" value="individual" checked> Myself</label>
+                    <label><input type="radio" name="pay_by" value="organisation"> My organisation</label>
+                  </div>
+                </div>
+                <div class="field"><label for="payment_date">Date you paid</label><input id="payment_date" name="payment_date" type="date"></div>
+                <div class="field full"><label for="receipt">Payment slip or screenshot</label>
+                  <div class="file-field"><div class="file-preview">No file</div><div><input type="file" id="receipt" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" data-pdf><p class="hint">Deposit slip, online transfer confirmation or screenshot. JPG / PNG / PDF, up to 10MB.</p></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="reg-submit">
+              <button class="btn btn-coral" type="submit" id="submit-btn">Submit registration</button>
+              <p class="muted">SLICNA checks each registration and emails you once it's confirmed.</p>
+            </div>
+            <div class="form-status" id="reg-status" role="status"></div>
+          </div>
+        </form>
+
+        <div class="form-card reg-done" id="reg-done" hidden></div>
+      </div>
+
+      <aside class="event-aside">
+        <div class="event-card" id="reg-summary"></div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/form-errors.js"></script>
+<script src="/js/membership-common.js"></script>
+<script src="/js/event-register.js"></script>
+</body>
+</html>

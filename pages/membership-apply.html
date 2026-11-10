@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apply for Membership | SLICNA</title>
+  <meta name="description" content="Apply online for SLICNA membership: Lifetime, General, Ordinary or Partial.">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="membership">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="page-head" style="padding-bottom:24px">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / <a href="/pages/membership.html">Membership</a> / Apply</nav>
+      <p class="eyebrow">Membership application</p>
+      <h1>Apply for membership</h1>
+      <p class="lede">It takes about ten minutes. Have your NIC, a passport-size photo and your payment slip ready.</p>
+    </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0">
+    <div class="wrap" style="max-width:900px">
+      <div class="callout callout-warn" id="draft-note" hidden style="margin-bottom:18px"></div>
+
+      <div class="form-card" id="apply-card">
+        <ol class="stepper" id="stepper" aria-label="Application steps"></ol>
+
+        <form id="apply-form" novalidate>
+          <!-- Step 1: category -->
+          <div class="step-panel" data-step="category" data-title="Category">
+            <h2>Which membership are you applying for?</h2>
+            <p class="muted">Not sure? <a href="/pages/membership.html#helper">Use the helper</a> on the membership page.</p>
+            <div class="choice-grid" id="category-choices"></div>
+          </div>
+
+          <!-- Step 2: about you -->
+          <div class="step-panel" data-step="personal" data-title="About you" hidden>
+            <h2>About you</h2>
+            <p class="muted">As shown on your NIC.</p>
+            <div class="form-grid">
+              <div class="field"><label for="title">Title</label>
+                <select id="title" name="title" required><option value="">Select title</option><option value="Prof.">Prof.</option><option value="Dr.">Dr.</option><option value="Mr.">Mr.</option><option value="Miss.">Miss.</option><option value="Mrs.">Mrs.</option></select></div>
+              <div class="field"><label>Sex</label>
+                <div class="inline-choices">
+                  <label class="choice"><input type="radio" name="sex" value="Female" required><span class="choice-box">Female</span></label>
+                  <label class="choice"><input type="radio" name="sex" value="Male"><span class="choice-box">Male</span></label>
+                </div></div>
+              <div class="field full"><label for="full_name">Name in full</label><input id="full_name" name="full_name" required maxlength="255" autocomplete="name"></div>
+              <div class="field full"><label for="name_with_initials">Name with initials</label><input id="name_with_initials" name="name_with_initials" required maxlength="255" placeholder="e.g. K.A.A. Perera"></div>
+              <div class="field"><label for="nic_number">NIC number</label><input id="nic_number" name="nic_number" required maxlength="12" placeholder="e.g. 855420159V or 199554200159" data-nic></div>
+              <div class="field"><label for="date_of_birth">Date of birth</label><input id="date_of_birth" name="date_of_birth" type="date" required></div>
+              <div class="field"><label for="marital_status">Marital status</label>
+                <select id="marital_status" name="marital_status" required><option value="">Select status</option><option value="Single">Single</option><option value="Married">Married</option><option value="Other">Other</option></select></div>
+              <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" required maxlength="255" autocomplete="email"></div>
+              <div class="field"><label for="mobile">Mobile</label><input id="mobile" name="mobile" type="tel" required maxlength="13" autocomplete="tel" placeholder="07XXXXXXXX or +947XXXXXXXX" data-phone="mobile"></div>
+              <div class="field"><label for="whatsapp">WhatsApp <span class="opt">(optional)</span></label><input id="whatsapp" name="whatsapp" type="tel" maxlength="13" placeholder="07XXXXXXXX or +947XXXXXXXX" data-phone="phone"></div>
+              <div class="field"><label for="residential_phone">Residential phone <span class="opt">(optional)</span></label><input id="residential_phone" name="residential_phone" type="tel" maxlength="13" placeholder="0XXXXXXXXX or +94XXXXXXXXX" data-phone="phone"></div>
+              <div class="field"><label for="office_phone" data-label-pm="University / school phone">Office phone <span class="opt">(optional)</span></label><input id="office_phone" name="office_phone" type="tel" maxlength="13" placeholder="0XXXXXXXXX or +94XXXXXXXXX" data-phone="phone"></div>
+              <div class="field full"><label for="permanent_address">Permanent address</label><textarea id="permanent_address" name="permanent_address" rows="2" required maxlength="500"></textarea></div>
+            </div>
+          </div>
+
+          <!-- Step 3: nursing details -->
+          <div class="step-panel" data-step="nursing" data-title="Your nursing" hidden>
+            <h2 data-text-pm="Your studies">Your nursing career</h2>
+            <p class="muted" data-text-pm="Details of your nursing school or university.">Registration, workplace and training.</p>
+
+            <!-- As in SLNA's join form: the number and date are required unless the box is ticked. -->
+            <div class="toggle-block" data-hide="PM">
+              <label class="consent"><input type="checkbox" name="slnc_not_registered" value="true" data-toggles="slnc"> I do not have my SLNC registration number yet</label>
+              <div class="form-grid" data-toggle-group="slnc">
+                <div class="field"><label for="slnc_number">SLNC registration number</label><input id="slnc_number" name="slnc_number" maxlength="50" data-required-for="LT GM OM"></div>
+                <div class="field"><label for="slnc_date">SLNC registration date</label><input id="slnc_date" name="slnc_date" type="date" data-required-for="LT GM OM"></div>
+              </div>
+            </div>
+            <div class="toggle-block">
+              <label class="consent"><input type="checkbox" name="slna_not_member" value="true" data-toggles="slna"> I do not have an SLNA membership number yet</label>
+              <div class="form-grid" data-toggle-group="slna">
+                <div class="field"><label for="slna_number">SLNA membership number</label><input id="slna_number" name="slna_number" maxlength="50" data-required-for="LT GM OM PM"></div>
+                <div class="field"><label for="slna_date">SLNA registration date</label><input id="slna_date" name="slna_date" type="date" data-required-for="LT GM OM PM"></div>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="field full"><label for="current_working_place" data-label-pm="Current institution (nursing school / university)">Current working place (hospital and unit)</label><input id="current_working_place" name="current_working_place" required maxlength="255"></div>
+              <div class="field full"><label for="official_address" data-label-pm="Official address (nursing school / university)">Official address</label><input id="official_address" name="official_address" required maxlength="500"></div>
+              <div class="field"><label for="designation">Designation</label><input id="designation" name="designation" required maxlength="255" placeholder="e.g. Nursing Officer" data-placeholder-pm="e.g. Student nurse"></div>
+              <div class="field"><label for="nursing_school">Nursing school / university</label><input id="nursing_school" name="nursing_school" required maxlength="255"></div>
+              <div class="field"><label for="batch">Batch</label><input id="batch" name="batch" required maxlength="50"></div>
+              <div class="field" data-hide="PM"><label for="first_appointment_date">First appointment date</label><input id="first_appointment_date" name="first_appointment_date" type="date" data-required-for="LT GM OM"></div>
+              <div class="field" data-hide="PM"><label for="first_appointment_place">First appointment place</label><input id="first_appointment_place" name="first_appointment_place" maxlength="255" data-required-for="LT GM OM"></div>
+              <div class="field" data-only="PM"><label for="student_number">Student number</label><input id="student_number" name="student_number" maxlength="50" data-required-for="PM"></div>
+              <div class="field" data-only="PM"><label for="institute_registration_date">Date of registration at the institute</label><input id="institute_registration_date" name="institute_registration_date" type="date" data-required-for="PM"></div>
+              <div class="field" data-only="LT"><label for="icu_training_batch">ICU training batch (PBCN)</label><input id="icu_training_batch" name="icu_training_batch" maxlength="50" data-required-for="LT"></div>
+              <div class="field" data-only="LT"><label for="icu_training_type">Diploma or certificate</label>
+                <select id="icu_training_type" name="icu_training_type" data-required-for="LT"><option value="">Select</option><option value="diploma">Diploma</option><option value="certificate">Certificate</option></select></div>
+              <div class="field" data-only="LT"><label for="icu_training_year">Year</label><input id="icu_training_year" name="icu_training_year" type="number" min="1950" max="2100" data-required-for="LT"></div>
+              <div class="field full"><label for="higher_qualifications">Higher educational qualifications <span class="opt">(optional)</span></label><textarea id="higher_qualifications" name="higher_qualifications" rows="3" maxlength="2000" placeholder="One per line, e.g. BSc Nursing (OUSL), 2018"></textarea></div>
+            </div>
+          </div>
+
+          <!-- Step 4: photo & payment -->
+          <div class="step-panel" data-step="payment" data-title="Photo &amp; payment" hidden>
+            <h2>Photo and payment</h2>
+            <p class="muted">Your photo is used for your membership ID card.</p>
+            <div class="form-grid">
+              <div class="field full"><label for="photo">Passport-size photo</label>
+                <div class="file-field"><div class="file-preview">No photo</div><div><input type="file" id="photo" name="photo" accept="image/jpeg,image/png,image/webp" required><p class="hint">A recent, clear photo of your face against a plain background. JPG / PNG, up to 10MB.</p></div></div></div>
+            </div>
+            <h3 style="font-size:21px;margin-top:26px">Membership fee</h3>
+            <p><span class="amount-due" id="fee-amount"></span> <span class="muted" id="fee-period"></span></p>
+            <p class="muted">Pay by bank transfer or deposit, then upload the slip or a screenshot below.</p>
+            <div id="bank-details"></div>
+            <div class="form-grid" style="margin-top:20px">
+              <div class="field"><label for="payment_date">Date you paid</label><input id="payment_date" name="payment_date" type="date" required></div>
+              <div class="field full"><label for="receipt">Payment slip or screenshot</label>
+                <div class="file-field"><div class="file-preview">No file</div><div><input type="file" id="receipt" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" required data-pdf><p class="hint">Deposit slip, online transfer confirmation or screenshot. JPG / PNG / PDF, up to 10MB.</p></div></div></div>
+            </div>
+          </div>
+
+          <!-- Step 5: review -->
+          <div class="step-panel" data-step="review" data-title="Review" hidden>
+            <h2>Check and submit</h2>
+            <p class="muted">Please check your details. You can go back to any section to make changes.</p>
+            <div id="review"></div>
+            <label class="consent" style="margin-top:18px"><input type="checkbox" id="declaration" name="declaration" value="true" required> The above details are true to the best of my knowledge.</label>
+            <div class="form-status" id="submit-status" role="status"></div>
+          </div>
+
+          <div class="step-nav">
+            <button type="button" class="btn btn-light" id="back-btn">Back</button>
+            <button type="button" class="btn btn-coral" id="next-btn">Continue</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="form-card success-panel" id="success" hidden></div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/form-errors.js"></script>
+<script src="/js/membership-common.js"></script>
+<script src="/js/membership-apply.js"></script>
+</body>
+</html>

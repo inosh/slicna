@@ -16,6 +16,12 @@
 <div id="site-header"></div>
 
 <main id="main">
+  <!-- Scrolling headlines, as on the SLNA News page. Pauses on hover; still for reduced motion. -->
+  <div class="news-ticker" id="news-ticker" hidden>
+    <span class="news-ticker-label"><span class="live-dot" aria-hidden="true"></span>Latest news</span>
+    <div class="news-ticker-track"><div class="news-ticker-content" id="news-ticker-content"></div></div>
+  </div>
+
   <section class="page-head">
     <div class="wrap">
       <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / News</nav>
@@ -35,7 +41,6 @@
 <div id="site-footer"></div>
 
 <script src="/js/config.js"></script>
-<script src="/js/demo-data.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/main.js"></script>
 <script>
@@ -46,6 +51,15 @@
       el.innerHTML = news.length
         ? news.map((n, i) => SLICNA.newsCard(n, i === 0)).join('')
         : '<p class="empty">No news yet.</p>';
+      // Ticker: the ten newest headlines, twice in a row so the scroll loops seamlessly.
+      if (news.length) {
+        const links = news.slice(0, 10).map((n) => `<a href="/pages/news-detail.html?id=${encodeURIComponent(n.id)}"><time>${SLICNA.escapeHtml(SLICNA.formatDate(n.published_at))}</time> ${SLICNA.escapeHtml(n.title)}</a><span class="news-ticker-sep" aria-hidden="true">&bull;</span>`).join('');
+        const content = document.getElementById('news-ticker-content');
+        content.innerHTML = `<span>${links}</span><span aria-hidden="true">${links}</span>`;
+        content.lastElementChild.querySelectorAll('a').forEach((a) => { a.tabIndex = -1; });
+        content.style.setProperty('--ticker-time', Math.max(20, Math.min(news.length, 10) * 7) + 's');
+        document.getElementById('news-ticker').hidden = false;
+      }
     } catch (err) {
       el.innerHTML = '<p class="empty">News could not be loaded right now.</p>';
     }

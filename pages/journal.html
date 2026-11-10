@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Journal | SLICNA</title>
+  <meta name="description" content="Read the SLICNA journal online: flip through the latest issue page by page, or browse past issues.">
+  <meta name="theme-color" content="#062b2a">
+  <link rel="icon" type="image/png" href="/images/slicna-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body data-section="learning">
+<div id="site-header"></div>
+
+<main id="main">
+  <section class="page-head" style="padding-bottom:24px">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a> / Learning / Journal</nav>
+      <p class="eyebrow">SLICNA Journal</p>
+      <h1>Read the latest issue</h1>
+      <p class="lede">Turn the pages of our journal right here, or open the PDF to read it your way.</p>
+    </div>
+  </section>
+
+  <section class="section-tight" style="padding-top:0">
+    <div class="wrap">
+      <div class="journal-reader" id="reader" hidden>
+        <div class="reader-head">
+          <div>
+            <p class="reader-issue" id="reader-issue"></p>
+            <h2 id="reader-title"></h2>
+          </div>
+          <div class="reader-actions">
+            <button type="button" class="btn btn-teal btn-sm" id="reader-zoom" disabled>Zoom in to read</button>
+            <a class="btn btn-light btn-sm" id="reader-pdf" target="_blank" rel="noopener">Open PDF</a>
+            <button type="button" class="btn btn-teal btn-sm" id="reader-full">Full screen</button>
+          </div>
+        </div>
+
+        <div class="book-stage" id="book-stage">
+          <div class="book-loading" id="book-loading" role="status">
+            <div class="book-loading-bar"><span id="book-progress"></span></div>
+            <p id="book-loading-text">Opening the journal…</p>
+          </div>
+          <button type="button" class="book-nav book-prev" id="book-prev" aria-label="Previous page" disabled>&#8249;</button>
+          <div class="book" id="book"></div>
+          <button type="button" class="book-nav book-next" id="book-next" aria-label="Next page" disabled>&#8250;</button>
+        </div>
+
+        <div class="reader-foot">
+          <input type="range" id="book-slider" min="1" max="1" value="1" aria-label="Go to page" disabled>
+          <span class="book-counter" id="book-counter" aria-live="polite"></span>
+        </div>
+
+        <!-- One page, large and sharp: zoom in and out, scroll or drag to move around. -->
+        <div class="zoom-view" id="zoom-view" role="dialog" aria-modal="true" aria-label="Zoomed page" hidden>
+          <div class="zoom-bar">
+            <span class="zoom-page" id="zoom-page" aria-live="polite"></span>
+            <div class="zoom-controls">
+              <button type="button" class="zoom-btn" id="zoom-out" aria-label="Zoom out">&minus;</button>
+              <span class="zoom-level" id="zoom-level"></span>
+              <button type="button" class="zoom-btn" id="zoom-in" aria-label="Zoom in">+</button>
+              <button type="button" class="btn btn-light btn-sm" id="zoom-fit">Fit width</button>
+            </div>
+            <button type="button" class="btn btn-teal btn-sm" id="zoom-close">Close</button>
+          </div>
+          <div class="zoom-scroll" id="zoom-scroll" tabindex="0">
+            <canvas id="zoom-canvas"></canvas>
+          </div>
+          <button type="button" class="book-nav zoom-nav zoom-prev" id="zoom-prev" aria-label="Previous page">&#8249;</button>
+          <button type="button" class="book-nav zoom-nav zoom-next" id="zoom-next" aria-label="Next page">&#8250;</button>
+        </div>
+      </div>
+      <p class="reader-desc" id="reader-desc" hidden></p>
+      <p class="muted reader-hint">Tip: use the arrow keys, swipe, or click a page corner to turn pages. Double-click a page or use "Zoom in to read" to enlarge it.</p>
+
+      <p class="empty" id="journal-empty" hidden>The first issue of the SLICNA journal is on its way. Please check back soon.</p>
+    </div>
+  </section>
+
+  <section class="section" id="past-issues" hidden>
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Archive</p>
+          <h2>All issues</h2>
+        </div>
+        <p>Choose an issue to open it in the reader above.</p>
+      </div>
+      <div class="issue-grid" id="issue-grid"></div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="/js/config.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/main.js"></script>
+<!-- PDF.js draws the pages; StPageFlip turns them like a book. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+<script src="/js/journal.js"></script>
+</body>
+</html>

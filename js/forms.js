@@ -31,9 +31,9 @@ const SLICNA_FORMS = (() => {
         showStatus(status, 'ok', successMessage);
         form.reset();
       } catch (err) {
-        const message = SLICNA_CONFIG.DATA_SOURCE === 'demo' || SLICNA_CONFIG.USE_DEMO_FALLBACK
-          ? 'Preview mode: the website backend is not connected yet, so this form was not sent.'
-          : 'Sorry, something went wrong. Please try again, or contact us by phone.';
+        const message = err.notOpen
+          ? 'Online submissions are not open yet. Please call 071 338 5768 or email slicna2022@gmail.com.'
+          : err.message || 'Sorry, something went wrong. Please try again, or contact us by phone.';
         showStatus(status, 'error', message);
       } finally {
         button.disabled = false;
