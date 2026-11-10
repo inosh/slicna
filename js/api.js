@@ -28,7 +28,9 @@ const SLICNA_API = (() => {
     }
   }
 
-  // Uploaded images are stored as "/uploads/..." paths on the backend.
+  // Uploaded files are stored as "/uploads/<key>" paths. As on SLNA, they're
+  // loaded through the backend, which redirects to the public R2 bucket, so the
+  // bucket's address is set in one place only (the backend's R2_PUBLIC_BASE_URL).
   function mediaUrl(url) {
     if (!url) return '';
     return url.startsWith('/uploads/') ? origin + url : url;

@@ -24,17 +24,97 @@ document.addEventListener('DOMContentLoaded', async () => {
     return [ph && part(ph, 'photo'), v && part(v, 'video')].filter(Boolean).join(' and ') || 'Nothing yet';
   };
 
-  function renderGrid(items) {
-    shown = items;
-    gridEl.hidden = false;
-    gridEl.innerHTML = items.map((m, i) => `
-      <figure tabindex="0" data-i="${i}" class="${m.type === 'video' ? 'is-video' : ''}">
-        ${m.type === 'video'
-          ? `<video src="${m.src}" muted preload="metadata" aria-label="Video: ${esc(m.caption)}"></video><span class="media-play" aria-hidden="true">&#9658;</span>`
-          : `<img src="${m.src}" alt="${esc(m.caption)}" decoding="async" loading="lazy">`}
-        <figcaption>${esc(m.caption)}</figcaption>
-      </figure>`).join('') || '<p class="empty">No photos or videos yet.</p>';
+  // Masonry, filled from the top without anything jumping: each photo is put
+  // (in order) into the shortest column only once it has loaded, so tiles already
+  // on screen never move. Photos load a batch at a time; the next batch when you
+  // scroll near the bottom. Videos have a fixed shape, so they go in straight away.
+  const BATCH = 12;
+  const COL_MIN = 280;
+  const GAP = 16;
+  let run = 0;          // a new view cancels the one still loading
+  let placed = [];      // figures placed so far, in order
+  let colCount = 0;
+
+  const columnsFor = () => Math.max(1, Math.min(3, Math.floor((gridEl.clientWidth + GAP) / (COL_MIN + GAP))));
+
+  function figureFor(m, i) {
+    const fig = document.createElement('figure');
+    fig.tabIndex = 0;
+    fig.dataset.i = i;
+    if (m.type === 'video') fig.className = 'is-video';
+    fig.innerHTML = `${m.type === 'video'
+      ? `<video src="${m.src}" muted preload="metadata" aria-label="Video: ${esc(m.caption)}"></video><span class="media-play" aria-hidden="true">&#9658;</span>`
+      : `<img src="${m.src}" alt="${esc(m.caption)}" decoding="async">`}
+      <figcaption>${esc(m.caption)}</figcaption>`;
+    return fig;
   }
+
+  function buildColumns() {
+    colCount = columnsFor();
+    gridEl.innerHTML = Array.from({ length: colCount }, () => '<div class="masonry-col"></div>').join('');
+  }
+  const shortestColumn = () => [...gridEl.children].reduce((a, c) => (c.offsetHeight < a.offsetHeight ? c : a));
+  function place(fig) {
+    shortestColumn().appendChild(fig);
+    requestAnimationFrame(() => fig.classList.add('is-in'));
+  }
+
+  // Resolves once the photo has loaded (or failed), so its height is known.
+  const loaded = (fig) => {
+    const img = fig.querySelector('img');
+    if (!img || img.complete) return Promise.resolve();
+    return new Promise((done) => { img.onload = done; img.onerror = done; });
+  };
+
+  // Resolves when the bottom of the grid is within about a screen of the bottom of the window.
+  const nearBottom = (my) => new Promise((done) => {
+    const check = () => {
+      if (my !== run || gridEl.getBoundingClientRect().bottom < window.innerHeight * 2) {
+        window.removeEventListener('scroll', check);
+        window.removeEventListener('resize', check);
+        done();
+      }
+    };
+    window.addEventListener('scroll', check, { passive: true });
+    window.addEventListener('resize', check);
+    check();
+  });
+
+  async function renderGrid(items) {
+    shown = items;
+    const my = ++run;
+    placed = [];
+    gridEl.hidden = false;
+    if (!items.length) {
+      gridEl.innerHTML = '<p class="empty">No photos or videos yet.</p>';
+      return;
+    }
+    buildColumns();
+    for (let start = 0; start < items.length; start += BATCH) {
+      // The whole batch loads at once; each photo goes in after the ones before it.
+      const figs = items.slice(start, start + BATCH).map((m, k) => figureFor(m, start + k));
+      const ready = figs.map(loaded);
+      for (let k = 0; k < figs.length; k++) {
+        await ready[k];
+        if (my !== run) return;
+        place(figs[k]);
+        placed.push(figs[k]);
+      }
+      if (start + BATCH < items.length) await nearBottom(my);
+      if (my !== run) return;
+    }
+  }
+
+  // A different number of columns (window resized): lay the placed tiles out again, in order.
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (gridEl.hidden || !placed.length || columnsFor() === colCount) return;
+      buildColumns();
+      placed.forEach((fig) => shortestColumn().appendChild(fig));
+    }, 150);
+  });
 
   // The address follows the view, so links and Back keep it.
   function setUrl(params) {
@@ -106,7 +186,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   gridEl.addEventListener('keydown', (e) => { const fig = e.target.closest('figure[data-i]'); if (fig && e.key === 'Enter') openAt(fig); });
 
   try {
-    albums = await SLICNA_API.albums();
+    // Newest first (by the album's date; undated ones last), for the album cards and the All view.
+    albums = (await SLICNA_API.albums()).sort((a, b) => String(b.event_date || '').localeCompare(String(a.event_date || '')) || b.id - a.id);
     const params = new URLSearchParams(location.search);
     if (params.get('album')) {
       showAlbum(params.get('album'));

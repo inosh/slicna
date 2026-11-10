@@ -486,9 +486,14 @@ table.data tfoot .num { color: #fff; }
 .contact-tile span { font-size: 14px; color: var(--ink-2); word-break: break-word; }
 
 /* ---------- Gallery ---------- */
-.masonry { columns: 3 280px; column-gap: 16px; }
-.masonry figure { margin: 0 0 16px; break-inside: avoid; border-radius: var(--radius); overflow: hidden; position: relative; cursor: zoom-in; background: var(--paper-2); }
-.masonry img { width: 100%; height: auto; transition: transform .4s ease; }
+/* Gallery: masonry columns filled by js/gallery.js (each photo goes into the
+   shortest column once loaded, so nothing already shown moves); tiles fade in. */
+.masonry { display: flex; gap: 16px; align-items: flex-start; }
+.masonry-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.masonry figure { margin: 0; border-radius: var(--radius); overflow: hidden; position: relative; cursor: zoom-in; background: var(--paper-2); opacity: 0; transform: translateY(8px); transition: opacity .35s ease, transform .35s ease; }
+.masonry figure.is-in { opacity: 1; transform: none; }
+.masonry img { width: 100%; height: auto; display: block; transition: transform .4s ease; }
+@media (prefers-reduced-motion: reduce) { .masonry figure { transform: none; transition: opacity .2s; } }
 .masonry figure:hover img { transform: scale(1.03); }
 .masonry figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 30px 14px 12px; color: #fff; font-size: 14px; font-weight: 600; background: linear-gradient(180deg, transparent, rgba(6, 43, 42, .85)); opacity: 0; transition: opacity .2s; }
 .masonry figure:hover figcaption, .masonry figure:focus-visible figcaption { opacity: 1; }
