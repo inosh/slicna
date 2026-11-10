@@ -41,9 +41,10 @@ const SLICNA = (() => {
   // "CPD" first on CPD events in the lists, so they stand out from association events.
   const cpdTag = (event) => (event.category === 'cpd' ? '<span class="tag-cpd">CPD</span>' : '');
 
-  // Status badge for upcoming events ("Registration Open" stands out).
+  // Status badge ("Registration Open" stands out); past events say "Completed".
   function statusBadge(event) {
-    if (event.is_past || !event.status_label) return '';
+    if (event.is_past) return '<span class="event-status event-status-past">Completed</span>';
+    if (!event.status_label) return '';
     const ongoing = event.is_ongoing ? ' <span class="event-status event-status-ongoing">Ongoing</span>' : '';
     return `<span class="event-status event-status-${escapeHtml(event.status)}">${escapeHtml(event.status_label)}</span>${ongoing}`;
   }
@@ -62,12 +63,14 @@ const SLICNA = (() => {
   function eventRow(event) {
     const d = parseDate(event.event_date);
     const day = d ? d.getDate() : '—';
-    const mon = d ? `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` : '';
+    // Month and the full year on separate lines ("OCT 26" read like a second date).
+    const mon = d ? MONTHS[d.getMonth()] : '';
+    const yr = d ? d.getFullYear() : '';
     const points = event.cpd_points ? `<span>${formatPoints(event.cpd_points)} CPD points</span>` : '';
     const fee = !event.is_past && feeShort(event) ? `<span>${escapeHtml(feeShort(event))}</span>` : '';
     return `
-      <a class="event-row" href="/pages/event-detail.html?id=${encodeURIComponent(event.id)}">
-        <div class="date-tile"><b>${day}</b><span>${mon}</span></div>
+      <a class="event-row${event.is_past ? ' is-past' : ''}" href="/pages/event-detail.html?id=${encodeURIComponent(event.id)}">
+        <div class="date-tile"><b>${day}</b><span>${mon}</span><span class="date-year">${yr}</span></div>
         <div>
           <div class="event-tags">${cpdTag(event)}${typeTag(event)}${statusBadge(event)}</div>
           <h3>${escapeHtml(event.title)}</h3>

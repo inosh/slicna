@@ -524,8 +524,7 @@ table.data tfoot .num { color: #fff; }
 .event-status-closed, .event-status-past { background: #e6eaeb; color: var(--ink-2); }
 .event-status-ongoing, .status-ongoing { background: #e3edfb; color: #1f4f8f; }
 .events-toolbar { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
-.events-count { font-size: 14px; margin: 14px 0 0; min-height: 1em; }
-.event-list { margin-top: 14px; }
+.event-list { margin-top: 24px; }
 .spotlight { display: grid; grid-template-columns: minmax(0, 340px) 1fr; gap: clamp(20px, 4vw, 44px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); padding: clamp(16px, 3vw, 28px); box-shadow: var(--shadow-1); }
 .spotlight-noimg { grid-template-columns: 1fr; }
 .spotlight-media { display: block; border-radius: var(--radius); overflow: hidden; background: var(--paper-2); align-self: start; }
@@ -1047,3 +1046,9 @@ table.data tfoot .num { color: #fff; }
 /* Application form: the "Join SLNA" pointer under the SLNA number. */
 .toggle-block .slna-join { margin: 10px 0 0; }
 .slna-join a { font-weight: 600; }
+/* Event rows: the year under the month; past events greyed, with year headings in the Past list. */
+.date-tile .date-year { margin-top: 1px; font-size: 11px; letter-spacing: .08em; opacity: .75; }
+.event-row.is-past .date-tile { background: #e9edee; color: var(--ink-2); }
+/* Month headings in the events list (as on SLNA): small, with a thin line under them. */
+.events-month { margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--mint); font-family: var(--font-text); font-size: 13px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--teal-ink); }
+.events-month:first-child { margin-top: 0; }
