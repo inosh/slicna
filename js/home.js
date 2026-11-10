@@ -22,6 +22,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const total = cpdYear.reduce((sum, e) => sum + Number(e.cpd_points), 0);
       const intl = events.filter((e) => e.event_type === 'International Workshop' && yearOf(e) === year).length;
 
+      // Earlier years (up to three), each linking to that year on the CPD page.
+      const past = SLICNA.cpdYears(events).filter((y) => y.year < year).slice(0, 3);
+      if (past.length) {
+        document.getElementById('cpd-past-list').innerHTML = past.map((y) => `
+          <li><a href="/pages/cpd.html?year=${y.year}">
+            <span class="cpd-past-year">${y.year}</span>
+            <span class="cpd-past-pts">${SLICNA.formatPoints(y.points)}<small>points</small></span>
+            <span class="cpd-past-meta">${y.count} programme${y.count === 1 ? '' : 's'}${y.intl ? ` · ${y.intl} international` : ''}</span>
+            <span class="cpd-past-go" aria-hidden="true">&rarr;</span>
+          </a></li>`).join('');
+        document.getElementById('cpd-past').hidden = false;
+      }
+
       document.querySelectorAll('[data-cpd-year]').forEach((el) => { el.textContent = year; });
       document.getElementById('hero-cpd-total').textContent = SLICNA.formatPoints(total);
       document.getElementById('cpd-total').textContent = SLICNA.formatPoints(total);
