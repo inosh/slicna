@@ -36,8 +36,6 @@ const SLICNA_API = (() => {
     return url.startsWith('/uploads/') ? origin + url : url;
   }
 
-  // The contact form isn't connected yet.
-  const notYetOpen = () => Promise.reject(Object.assign(new Error('Not open yet'), { notOpen: true }));
   const postJson = (path, body) => request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
   return {
@@ -61,6 +59,7 @@ const SLICNA_API = (() => {
     renewalLookup: (number) => postJson('/membership/renew/lookup', { membership_number: number }),
     renewalView: (token) => request('/membership/renew/' + encodeURIComponent(token)),
     submitRenewal: (token, formData) => request('/membership/renew/' + encodeURIComponent(token), { method: 'POST', body: formData }),
-    sendContact: notYetOpen
+    // Contact page: { name, phone, email, subject, message }
+    sendContact: (data) => postJson('/contact', data)
   };
 })();

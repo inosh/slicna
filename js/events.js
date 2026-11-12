@@ -1,26 +1,70 @@
 // Events page: a spotlight on the next CPD event, then the list filtered by
-// kind (CPD / association / all) and upcoming / past. ?kind=other and ?when=past preselect them.
+// kind (CPD / association / all) and upcoming / past; past events one year at a time.
+// ?kind=other, ?when=past and &year=2025 preselect them.
 document.addEventListener('DOMContentLoaded', async () => {
   const esc = SLICNA.escapeHtml;
   const listEl = document.getElementById('events-list');
   const params = new URLSearchParams(window.location.search);
-  const state = { kind: ['cpd', 'other', 'all'].includes(params.get('kind')) ? params.get('kind') : 'cpd', when: params.get('when') === 'past' ? 'past' : 'upcoming' };
+  const yearsEl = document.getElementById('events-years');
+  const state = { kind: ['cpd', 'other', 'all'].includes(params.get('kind')) ? params.get('kind') : 'cpd', when: params.get('when') === 'past' ? 'past' : 'upcoming', year: params.get('year') };
   document.querySelector(`[name="kind"][value="${state.kind}"]`).checked = true;
   document.querySelector(`[name="when"][value="${state.when}"]`).checked = true;
   let events = [];
 
   const KIND_WORDS = { cpd: 'CPD events', other: 'association events', all: 'events' };
 
+  // Past events: one year at a time (buttons for each year, newest first), in slim rows.
+  const yearOf = (e) => String(e.event_date || '').slice(0, 4);
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function pastRow(e) {
+    const d = SLICNA.parseDate(e.event_date);
+    const meta = [e.location && `<span>${esc(e.location)}</span>`, e.cpd_points && `<span>${SLICNA.formatPoints(e.cpd_points)} CPD points</span>`].filter(Boolean).join('');
+    return `
+      <a class="event-row is-past past-row" href="/pages/event-detail.html?id=${encodeURIComponent(e.id)}">
+        <div class="date-tile"><b>${d ? d.getDate() : '—'}</b><span>${d ? MONTHS[d.getMonth()] : ''}</span></div>
+        <div>
+          <h3>${esc(e.title)}</h3>
+          <div class="event-meta">${SLICNA.cpdTag(e)}${SLICNA.typeTag(e)}${meta}</div>
+        </div>
+        <span class="event-go" aria-hidden="true">&rarr;</span>
+      </a>`;
+  }
+
+  function renderYears(list) {
+    const years = [...new Set(list.map(yearOf).filter(Boolean))];
+    if (!years.includes(state.year)) state.year = years[0] || null;
+    yearsEl.hidden = state.when !== 'past' || years.length < 2;
+    yearsEl.innerHTML = years.map((y) => `<button type="button" data-year="${y}" aria-pressed="${y === state.year}">${y}</button>`).join('');
+  }
+
+  function syncUrl() {
+    const url = new URL(window.location.href);
+    if (state.kind === 'cpd') url.searchParams.delete('kind'); else url.searchParams.set('kind', state.kind);
+    if (state.when === 'upcoming') url.searchParams.delete('when'); else url.searchParams.set('when', state.when);
+    if (state.when === 'past' && state.year && state.year !== yearsEl.querySelector('button')?.dataset.year) url.searchParams.set('year', state.year);
+    else url.searchParams.delete('year');
+    history.replaceState(null, '', url);
+  }
+
   function render() {
     let list = events.filter((e) => state.kind === 'all' || e.category === state.kind);
     list = list.filter((e) => (state.when === 'upcoming') === !e.is_past);
-    if (state.when === 'past') list = [...list].reverse();
+    const past = state.when === 'past';
+    if (past) {
+      list = [...list].reverse();
+      renderYears(list);
+      list = list.filter((e) => yearOf(e) === state.year);
+    } else {
+      yearsEl.hidden = true;
+    }
+    listEl.classList.toggle('event-list-past', past);
     const n = list.length;
-    // A small month heading ("OCTOBER 2026") before each month's events, as on SLNA.
+    // A small month heading ("OCTOBER 2026") before each month's events, as on SLNA
+    // (the year is in the buttons above a past list, so there the month alone).
     const monthOf = (e) => String(e.event_date || '').slice(0, 7);
-    const monthLabel = (e) => { const d = SLICNA.parseDate(e.event_date); return d ? d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : ''; };
+    const monthLabel = (e) => { const d = SLICNA.parseDate(e.event_date); return d ? d.toLocaleDateString('en-GB', past && !yearsEl.hidden ? { month: 'long' } : { month: 'long', year: 'numeric' }) : ''; };
     listEl.innerHTML = n
-      ? list.map((e, i) => (monthOf(e) !== monthOf(list[i - 1] || {}) ? `<h3 class="events-month">${esc(monthLabel(e))}</h3>` : '') + SLICNA.eventRow(e)).join('')
+      ? list.map((e, i) => (monthOf(e) !== monthOf(list[i - 1] || {}) ? `<h3 class="events-month">${esc(monthLabel(e))}</h3>` : '') + (past ? pastRow(e) : SLICNA.eventRow(e))).join('')
       : `<p class="empty">${state.when === 'upcoming'
         ? `No upcoming ${KIND_WORDS[state.kind]} yet. New programmes are announced here and on our Facebook page.`
         : `No past ${KIND_WORDS[state.kind]}.`}</p>`;
@@ -58,16 +102,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.querySelector('.events-toolbar').addEventListener('change', (e) => {
     state[e.target.name] = e.target.value;
-    // The address follows the choice (?kind=other, ?when=past), so links and Back keep it.
-    if (e.target.name === 'kind' || e.target.name === 'when') {
-      const url = new URL(window.location.href);
-      if (state.kind === 'cpd') url.searchParams.delete('kind');
-      else url.searchParams.set('kind', state.kind);
-      if (state.when === 'upcoming') url.searchParams.delete('when');
-      else url.searchParams.set('when', state.when);
-      history.replaceState(null, '', url);
-    }
     render();
+    // The address follows the choice (?kind=other, ?when=past, &year=2025), so links and Back keep it.
+    syncUrl();
+  });
+
+  yearsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-year]');
+    if (!b) return;
+    state.year = b.dataset.year;
+    render();
+    syncUrl();
   });
 
   // Opened from the Events menu (#all-events): bring the list into view once it has loaded.
