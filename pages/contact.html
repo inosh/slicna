@@ -50,19 +50,19 @@
         <h2 style="font-size:28px">Send us a message</h2>
         <form id="contact-form" class="form-grid" novalidate>
           <div class="field"><label for="c-name">Your name</label><input id="c-name" name="name" required autocomplete="name"></div>
-          <div class="field"><label for="c-phone">Phone <span class="opt">(optional)</span></label><input id="c-phone" name="phone" type="tel" autocomplete="tel"></div>
-          <div class="field full"><label for="c-email">Email</label><input id="c-email" name="email" type="email" required autocomplete="email"></div>
+          <div class="field"><label for="c-phone">Phone</label><input id="c-phone" name="phone" type="tel" required autocomplete="tel" placeholder="07XXXXXXXX" data-check="phone"></div>
+          <div class="field full"><label for="c-email">Email</label><input id="c-email" name="email" type="email" required autocomplete="email" data-check="email"></div>
           <div class="field full">
             <label for="c-topic">Topic</label>
             <select id="c-topic" name="subject">
-              <option>Membership</option>
-              <option>CPD programmes</option>
-              <option>Partnership or sponsorship</option>
-              <option>Media</option>
-              <option>Something else</option>
+              <option value="membership">Membership</option>
+              <option value="cpd">CPD programmes</option>
+              <option value="partnership">Partnership or sponsorship</option>
+              <option value="media">Media</option>
+              <option value="other">Something else</option>
             </select>
           </div>
-          <div class="field full"><label for="c-message">Message</label><textarea id="c-message" name="message" required></textarea></div>
+          <div class="field full"><label for="c-message">Message</label><textarea id="c-message" name="message" required maxlength="5000"></textarea></div>
           <div class="full"><button class="btn btn-coral" type="submit">Send message</button></div>
         </form>
         <div class="form-status" id="contact-status" role="status"></div>

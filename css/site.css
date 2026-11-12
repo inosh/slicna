@@ -1052,3 +1052,18 @@ table.data tfoot .num { color: #fff; }
 /* Month headings in the events list (as on SLNA): small, with a thin line under them. */
 .events-month { margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--mint); font-family: var(--font-text); font-size: 13px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--teal-ink); }
 .events-month:first-child { margin-top: 0; }
+/* Events page, Past: one year at a time (year buttons under the toolbar) in slim rows. */
+.events-years { margin-top: 14px; }
+.event-list.event-list-past { gap: 8px; }
+.event-list-past .events-month { margin: 12px 0 2px; padding-bottom: 4px; }
+.event-list-past .events-month:first-child { margin-top: 0; }
+.past-row { grid-template-columns: 56px 1fr auto; gap: 16px; padding: 10px 16px 10px 10px; }
+.past-row:hover { transform: none; }
+.past-row .date-tile { padding: 6px 4px; border-radius: 10px; }
+.past-row .date-tile b { font-size: 22px; }
+.past-row .date-tile span { margin-top: 2px; font-size: 11px; }
+.past-row h3 { font-size: 17px; margin: 0 0 4px; }
+.past-row .event-meta { align-items: center; font-size: 13px; gap: 4px 12px; }
+.past-row .event-meta .tag-cpd, .past-row .event-meta .tag-teal, .past-row .event-meta .tag-gold, .past-row .event-meta .tag { padding: 1px 8px; font-size: 11px; }
+.past-row .event-go { width: 32px; height: 32px; font-size: 15px; }
+@media (max-width: 640px) { .past-row { grid-template-columns: 48px 1fr; gap: 12px; padding: 10px; } .past-row h3 { font-size: 15px; } }

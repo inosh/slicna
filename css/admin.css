@@ -329,3 +329,16 @@
 /* Filter bars with dropdowns: tabs on one row, dropdowns and search on the next, so they stay put when tab counts change. */
 .admin-filters.admin-filters-rows { flex-direction: column; align-items: stretch; }
 .admin-filters .filter-row { display: flex; flex-wrap: wrap; gap: inherit; align-items: center; }
+/* Contact messages */
+.contact-table tr.is-unread td:first-child, .contact-table tr.is-unread td:nth-child(2) { font-weight: 700; }
+.contact-h { display: block; margin: 18px 0 8px; font-size: 15px; font-weight: 700; }
+.contact-message { white-space: pre-wrap; padding: 14px 16px; border-radius: 12px; background: var(--paper-2, #f4efe6); line-height: 1.55; overflow-wrap: anywhere; }
+.contact-reply { background: #eef6f4; }
+.contact-reply-form textarea { width: 100%; font: inherit; font-size: 15px; line-height: 1.5; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; resize: vertical; }
+.contact-reply-form .hint { margin: 6px 0 0; font-size: 13px; color: var(--ink-3); }
+.contact-reply-form .field-error { margin: 8px 0 0; }
+.contact-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.contact-table .from-col { min-width: 230px; }
+.contact-table .from-col .admin-muted { overflow-wrap: anywhere; }
+.contact-status { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.contact-table td:last-child .admin-muted { margin-top: 4px; font-size: 12px; white-space: nowrap; }

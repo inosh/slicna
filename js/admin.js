@@ -1109,7 +1109,7 @@
 
   // ---------- Shell: navigation, user menu, password ----------
 
-  const GROUPS = { membership: 'Membership', events: 'Events & CPD', content: 'Website content' };
+  const GROUPS = { membership: 'Membership', events: 'Events & CPD', messages: 'Messages', content: 'Website content' };
   Object.values(SECTIONS).forEach((s) => { s.group = s.group || 'content'; });
 
   // Lets js/admin-membership.js and js/admin-events.js add their sections before the page starts.
@@ -1173,6 +1173,7 @@
         applications: o.applications.pending || 0,
         renewals: o.pending_renewals || 0,
         registrations: (await api('GET', '/events/admin/overview')).pending_registrations || 0,
+        contact: (await api('GET', '/contact/admin/overview')).new || 0,
       };
       Object.entries(counts).forEach(([key, n]) => set(key, n));
       // The phone menu button shows the total waiting across all sections.
