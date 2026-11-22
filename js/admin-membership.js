@@ -144,10 +144,10 @@
           </div>
           <div class="detail-section"><h3>Documents</h3><div data-docs></div></div>
           ${locked ? '' : `<div class="action-bar">
-            ${a.status === 'more_info_required' ? '<button type="button" class="btn btn-light btn-sm" data-act="info-received">Information received</button>' : ''}
+            ${a.status === 'more_info_required' || a.status === 'rejected' ? '<button type="button" class="btn btn-light btn-sm" data-act="info-received">Information received</button>' : ''}
             <button type="button" class="btn btn-light btn-sm" data-act="info">Request more info</button>
             <button type="button" class="btn btn-teal btn-sm" data-act="approve">Approve</button>
-            <button type="button" class="btn btn-light btn-sm" data-act="reject">Reject</button>
+            ${a.status === 'rejected' ? '' : '<button type="button" class="btn btn-light btn-sm" data-act="reject">Reject</button>'}
             <button type="button" class="btn btn-danger btn-sm" data-act="delete">Delete</button>
           </div>`}
         </div>
@@ -183,7 +183,8 @@
       if (!act) return;
 
       if (act === 'info-received') {
-        if (!(await confirmDialog({ title: 'Information received?', message: `"${a.reference_number}" moves back to Pending so it can be approved or rejected. Your earlier message is cleared from the applicant's status page.`, confirmText: 'Move to Pending' }))) return;
+        const earlier = a.status === 'rejected' ? 'The rejection reason is' : 'Your earlier message is';
+        if (!(await confirmDialog({ title: 'Information received?', message: `"${a.reference_number}" moves back to Pending so it can be approved or rejected. ${earlier} cleared from the applicant's status page.`, confirmText: 'Move to Pending' }))) return;
         try {
           await patch(fdOf({ status: 'pending', status_note: '' }));
           done('Moved back to Pending.');
