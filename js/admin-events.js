@@ -464,7 +464,8 @@
         return `<span>${year}: <b>${cpd.length}</b> CPD events, <b>${Number(total.toFixed(2))}</b> CPD points</span><span><b>${open}</b> open for registration</span><span><b>${pending}</b> registrations to review</span>`;
       },
       get columns() { return kind === 'other' ? eventColumns.filter((c) => !c.cpdOnly) : eventColumns; },
-      image: { column: 'photo_url', field: 'photo', label: 'Poster or photo' },
+      // The poster sits above the summary; the brochure stays the last item of the form.
+      image: { column: 'photo_url', field: 'photo', label: 'Poster or photo', before: 'summary' },
       defaults: () => ({ category: kind === 'other' ? 'other' : 'cpd', audience: 'public', fee_type: 'free', member_pricing: 'same', duration_number: 1, duration_unit: 'day' }),
       get fields() { return fields(); },
       form: { extra: eventExtras, onMount: mountEventForm, validate: validateEventForm, wide: true },

@@ -70,10 +70,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         : `No past ${KIND_WORDS[state.kind]}.`}</p>`;
   }
 
-  // The next CPD event open for registration, else the next upcoming CPD event.
+  // The next upcoming CPD event by date, whatever its status (Opening Soon, Open, Closed…).
   function renderSpotlight() {
-    const upcoming = events.filter((e) => e.category === 'cpd' && !e.is_past);
-    const e = upcoming.find((x) => x.registration_open) || upcoming[0];
+    const upcoming = events.filter((e) => e.category === 'cpd' && !e.is_past)
+      .sort((a, b) => String(a.event_date).localeCompare(String(b.event_date)));
+    const e = upcoming[0];
     if (!e) return;
     const fee = SLICNA.feeShort(e);
     const facts = [
