@@ -26,6 +26,7 @@
         <div class="prose" id="article-body"></div>
         <!-- The article's photos and videos (its album), as on the SLNA site. -->
         <section class="news-album" id="article-album" hidden aria-label="Photos and videos"></section>
+        <div id="article-share"></div>
         <p style="margin-top:40px"><a href="/pages/news.html" class="link-arrow">Back to all news</a></p>
       </article>
       <aside class="news-side" aria-labelledby="latest-title">
@@ -112,6 +113,7 @@
     // Article text: HTML from the admin's rich text editor, cleaned with DOMPurify
     // (as on SLNA), or older plain text split into paragraphs.
     SLICNA.richText(document.getElementById('article-body'), item.body || item.summary, item.summary);
+    document.getElementById('article-share').innerHTML = SLICNA.shareHtml(item.title, item.id);
 
     if (item.photos && item.photos.length) {
       const album = albumHtml(item);
