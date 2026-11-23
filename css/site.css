@@ -1067,3 +1067,11 @@ table.data tfoot .num { color: #fff; }
 .past-row .event-meta .tag-cpd, .past-row .event-meta .tag-teal, .past-row .event-meta .tag-gold, .past-row .event-meta .tag { padding: 1px 8px; font-size: 11px; }
 .past-row .event-go { width: 32px; height: 32px; font-size: 15px; }
 @media (max-width: 640px) { .past-row { grid-template-columns: 48px 1fr; gap: 12px; padding: 10px; } .past-row h3 { font-size: 15px; } }
+/* Share row on news and event pages (as on SLNA): WhatsApp and Facebook. */
+.share-buttons { display: flex; align-items: center; gap: 10px; margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); }
+.share-label { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-right: 2px; }
+.share-btn { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: #fff; transition: transform .15s ease, opacity .15s ease; }
+.share-btn:hover { opacity: .9; transform: translateY(-1px); text-decoration: none; }
+.share-whatsapp { background: #25D366; }
+.share-facebook { background: #1877F2; }
+.event-info .share-buttons { margin-top: 20px; }

@@ -1,7 +1,13 @@
 name = "slicna"
 compatibility_date = "2026-10-01"
 
-# Static site: Cloudflare serves the built dist/ folder directly (run `npm run build` first).
-# Add `main = "worker.js"` here later if server-side logic is needed, as in the SLNA site.
+# Static site: Cloudflare serves the built dist/ folder (run `npm run build` first).
+# worker.js runs first only for the news and event pages, to give Facebook /
+# WhatsApp link previews the real title, summary and image (as on the SLNA site);
+# every other request goes straight to the static files.
+main = "worker.js"
+
 [assets]
 directory = "./dist"
+binding = "ASSETS"
+run_worker_first = ["/pages/news-detail.html", "/pages/news-detail", "/pages/event-detail.html", "/pages/event-detail"]

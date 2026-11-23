@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const isCpd = event.category === 'cpd';
   document.title = `${event.title} | SLICNA`;
   titleEl.textContent = event.title;
+  document.getElementById('event-share').innerHTML = SLICNA.shareHtml(event.title, event.id);
   const crumb = document.getElementById('crumb-kind');
   crumb.textContent = isCpd ? 'CPD Events' : 'Association Events';
   crumb.href = isCpd ? '/pages/events.html' : '/pages/events.html?kind=other';
