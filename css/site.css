@@ -527,7 +527,7 @@ table.data tfoot .num { color: #fff; }
 .event-list { margin-top: 24px; }
 .spotlight { display: grid; grid-template-columns: minmax(0, 340px) 1fr; gap: clamp(20px, 4vw, 44px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); padding: clamp(16px, 3vw, 28px); box-shadow: var(--shadow-1); }
 .spotlight-noimg { grid-template-columns: 1fr; }
-.spotlight-media { display: block; border-radius: var(--radius); overflow: hidden; background: var(--paper-2); align-self: start; }
+.spotlight-media { display: block; border-radius: var(--radius); overflow: hidden; background: var(--paper-2); align-self: center; }
 .spotlight-media img { display: block; width: 100%; height: auto; }
 .spotlight-body h2 { font-size: clamp(24px, 3.2vw, 34px); margin: 10px 0 8px; }
 .spotlight-body .eyebrow { margin-bottom: 8px; }
