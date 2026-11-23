@@ -726,7 +726,7 @@
           <div class="detail-section"><h3>Registrant</h3>${dl([
             ['Full name', r.full_name], ['Name on certificate', r.certificate_name], [r.registrant_type === 'foreign' ? 'Passport number' : 'NIC', r.nic_number], ['Country', r.country],
             ['SLNC registration', r.slnc_number], ['Email', r.email], ['Mobile', r.mobile], ['Postal address', r.postal_address],
-            ['Workplace', r.workplace], ['Workplace address', r.workplace_address],
+            ['Designation', r.designation], ['Workplace', r.workplace], ['Workplace address', r.workplace_address],
           ])}</div>
           <div class="detail-section"><h3>Registered as</h3>${dl([
             ['Type', REGISTERED_AS[r.fee_category]],
