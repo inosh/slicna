@@ -75,7 +75,20 @@
               <div class="field"><label for="mobile">Mobile number</label><input id="mobile" name="mobile" type="tel" required autocomplete="tel" placeholder="07XXXXXXXX" data-phone="mobile"></div>
               <div class="field full"><label for="postal_address">Postal address</label><textarea id="postal_address" name="postal_address" rows="2" required autocomplete="street-address"></textarea></div>
               <div class="field"><label for="workplace">Workplace</label><input id="workplace" name="workplace" required placeholder="Hospital and unit, e.g. NHSL, ICU 2"></div>
-              <div class="field"><label for="workplace_address">Workplace address</label><input id="workplace_address" name="workplace_address" required></div>
+              <div class="field">
+                <label for="designation">Designation</label>
+                <select id="designation" name="designation" required>
+                  <option value="">Choose…</option>
+                  <option>Nursing Officer Grade 03</option>
+                  <option>Nursing Officer Grade 02</option>
+                  <option>Nursing Officer Grade 01</option>
+                  <option>Nursing Sister</option>
+                  <option>Sp. Grade Nursing Officer</option>
+                  <option>Nursing Tutor</option>
+                  <option>Student</option>
+                  <option>Other</option>
+                </select>
+              </div>
             </div>
           </div>
 
