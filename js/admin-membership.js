@@ -927,8 +927,8 @@
       }
       card.innerHTML = `
         <div class="admin-card-head"><div><h2>Fees</h2><p>Shown on the membership pages and used for new applications and renewals.</p></div></div>
-        <div class="admin-table-wrap"><table class="admin-table">
-          <thead><tr><th>Category</th><th>Fee</th><th>Period</th><th></th></tr></thead>
+        <div class="admin-table-wrap"><table class="admin-table fees-table">
+          <thead><tr><th>Category</th><th>Fee</th><th>Period</th><th><span class="sr-only">Actions</span></th></tr></thead>
           <tbody>${s.fees.map((f) => `<tr><td class="main-col">${esc(f.label)} (${esc(f.category)})</td><td>${esc(money(f.amount))}</td><td>${f.is_annual ? 'Per year' : 'One-time'}</td>
             <td><div class="row-actions"><button type="button" class="btn btn-light btn-sm" data-fee="${esc(f.category)}">Edit</button></div></td></tr>`).join('')}</tbody>
         </table></div>
